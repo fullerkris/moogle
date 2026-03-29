@@ -5,11 +5,32 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/IonelPopJara/search-engine/services/spider/internal/utils"
 )
+
+var enqueueIfUnseenScript = redis.NewScript(`
+local seenKey = KEYS[1]
+local queueKey = KEYS[2]
+local urlLookupKey = KEYS[3]
+
+local normalizedURL = ARGV[1]
+local rawURL = ARGV[2]
+local score = tonumber(ARGV[3])
+
+if redis.call("SISMEMBER", seenKey, normalizedURL) == 1 then
+    return 0
+end
+
+redis.call("SADD", seenKey, normalizedURL)
+redis.call("HSET", urlLookupKey, "raw_url", rawURL, "visited", 0)
+redis.call("ZADD", queueKey, score, normalizedURL)
+
+return 1
+`)
 
 // ------------------- REDIS SETUP -------------------
 type Database struct {
@@ -48,30 +69,8 @@ func (db *Database) ConnectToRedis(redisHost, redisPort, redisPassword, redisDB 
 // ------------------- REDIS SETUP -------------------
 
 // ------------------- CRAWL LINKS -------------------
-func (db *Database) addURLLookup(rawURL, normalizedURL string) error {
-	// Check if it exists
-	urlKey := utils.NormalizedURLPrefix + ":" + normalizedURL
-
-	exists, err := db.Client.Exists(db.Context, urlKey).Result()
-	if err != nil {
-		return fmt.Errorf("Key not found: %w", err)
-	}
-
-	if exists > 0 {
-		return fmt.Errorf("Key exists")
-	}
-
-	// Add hash
-	err = db.Client.HSet(db.Context, urlKey, map[string]interface{}{
-		"raw_url": rawURL,
-		"visited": 0,
-	}).Err()
-
-	if err != nil {
-		return fmt.Errorf("Could not store data in Redis: %w", err)
-	}
-
-	return nil
+func lookupKey(normalizedURL string) string {
+	return utils.NormalizedURLPrefix + ":" + normalizedURL
 }
 
 func (db *Database) PushURL(rawURL string, score float64) error {
@@ -87,20 +86,21 @@ func (db *Database) PushURL(rawURL string, score float64) error {
 		return fmt.Errorf("Could not normalize URL: %w", err)
 	}
 
-	// err = db.addURLLookup(rawURL, normalizedURL)
-	// if err != nil {
-	//     // If the url is already in the lookup, we don't add it
-	//     return fmt.Errorf("URL already in queue: %w", err)
-	// }
-
-	// Add the normalized url to a sorted set with 0 as score
-	err = db.Client.ZAdd(db.Context, utils.SpiderQueueKey, redis.Z{
-		Score:  score,
-		Member: normalizedURL,
-	}).Err()
+	res, err := enqueueIfUnseenScript.Run(
+		db.Context,
+		db.Client,
+		[]string{utils.SeenURLsKey, utils.SpiderQueueKey, lookupKey(normalizedURL)},
+		normalizedURL,
+		rawURL,
+		score,
+	).Int()
 
 	if err != nil {
 		return fmt.Errorf("Could not add URL to queue: %w", err)
+	}
+
+	if res == 0 {
+		return nil
 	}
 
 	fmt.Printf("Pushed %v (%v) to queue\n", rawURL, normalizedURL)
@@ -109,6 +109,11 @@ func (db *Database) PushURL(rawURL string, score float64) error {
 }
 
 func (db *Database) ExistsInQueue(rawURL string) (float64, bool) {
+	rawURL, err := utils.StripURL(rawURL)
+	if err != nil {
+		return 0.0, false
+	}
+
 	// Normalize URL
 	normalizedURL, err := utils.NormalizeURL(rawURL)
 	if err != nil {
@@ -127,36 +132,21 @@ func (db *Database) ExistsInQueue(rawURL string) (float64, bool) {
 
 // ------------------- VISIT PAGE -------------------
 func (db *Database) HasURLBeenVisited(normalizedURL string) (bool, error) {
-	// FIXME: This is a temporary fix
-	return false, nil
-	normalized_url_key := utils.NormalizedURLPrefix + ":" + normalizedURL
-	result, err := db.Client.HGet(db.Context, normalized_url_key, "visited").Result()
-
-	if err == redis.Nil {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("Could not fetch %v from Redis: %v\n", normalized_url_key, err)
-	}
-
-	visited, err := strconv.Atoi(result)
+	visited, err := db.Client.SIsMember(db.Context, utils.VisitedURLsKey, normalizedURL).Result()
 	if err != nil {
-		return false, fmt.Errorf("Could not parse 'visited' value: %v", err)
+		return false, fmt.Errorf("Could not fetch visit marker for %v: %w", normalizedURL, err)
 	}
 
-	if visited == 0 {
-		return false, nil
-	}
-
-	return true, nil
+	return visited, nil
 }
 
 func (db *Database) VisitPage(normalizedURL string) error {
-	return nil // FIXME: This is a temporary fix
-	normalized_url_key := utils.NormalizedURLPrefix + ":" + normalizedURL
-	_, err := db.Client.HSet(db.Context, normalized_url_key, "visited", 1).Result()
+	pipeline := db.Client.TxPipeline()
+	pipeline.SAdd(db.Context, utils.VisitedURLsKey, normalizedURL)
+	pipeline.HSet(db.Context, lookupKey(normalizedURL), "visited", 1)
 
-	if err != nil {
-		return fmt.Errorf("Could not update visit %v from Redis: %v\n", normalized_url_key, err)
+	if _, err := pipeline.Exec(db.Context); err != nil {
+		return fmt.Errorf("Could not mark %v as visited: %w", normalizedURL, err)
 	}
 
 	return nil
@@ -169,7 +159,30 @@ func (db *Database) PopURL() (string, float64, string, error) {
 	// Get the next normalized URL from the priority queue
 	result, err := db.Client.BZPopMin(db.Context, utils.Timeout, utils.SpiderQueueKey).Result()
 	if err != nil {
-		return "", 0.0, "", fmt.Errorf("Could not pop URL from queue: %v\n", err)
+		if strings.Contains(strings.ToLower(err.Error()), "unknown command") {
+			fallbackResult, fallbackErr := db.Client.ZPopMin(db.Context, utils.SpiderQueueKey, 1).Result()
+			if fallbackErr != nil {
+				return "", 0.0, "", fmt.Errorf("Could not pop URL from queue (fallback): %v", fallbackErr)
+			}
+
+			if len(fallbackResult) == 0 {
+				return "", 0.0, "", fmt.Errorf("Could not pop URL from queue: empty queue")
+			}
+
+			normalizedURL := fallbackResult[0].Member.(string)
+			rawURL, lookupErr := db.Client.HGet(db.Context, lookupKey(normalizedURL), "raw_url").Result()
+			if lookupErr != nil {
+				if lookupErr == redis.Nil {
+					return "", 0.0, "", fmt.Errorf("Missing raw URL mapping for %v", normalizedURL)
+				}
+
+				return "", 0.0, "", fmt.Errorf("Could not fetch raw URL for %v: %w", normalizedURL, lookupErr)
+			}
+
+			return rawURL, fallbackResult[0].Score, normalizedURL, nil
+		}
+
+		return "", 0.0, "", fmt.Errorf("Could not pop URL from queue: %v", err)
 	}
 
 	// Format the proper Redis queue to fetch data
@@ -182,11 +195,16 @@ func (db *Database) PopURL() (string, float64, string, error) {
 	// }
 
 	normalizedURL := result.Z.Member.(string)
-	raw_url := fmt.Sprintf("https://%v", normalizedURL)
+	rawURL, err := db.Client.HGet(db.Context, lookupKey(normalizedURL), "raw_url").Result()
+	if err != nil {
+		if err == redis.Nil {
+			return "", 0.0, "", fmt.Errorf("Missing raw URL mapping for %v", normalizedURL)
+		}
 
-	// Raw url is just the normalized url + https:// so we'll do it manually due to performance issues
+		return "", 0.0, "", fmt.Errorf("Could not fetch raw URL for %v: %w", normalizedURL, err)
+	}
 
-	return raw_url, result.Z.Score, normalizedURL, nil
+	return rawURL, result.Z.Score, normalizedURL, nil
 }
 
 func (db *Database) PopSignalQueue() (string, error) {

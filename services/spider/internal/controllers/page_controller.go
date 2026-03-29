@@ -1,103 +1,120 @@
 package controllers
 
-import(
-    "log"
-    "github.com/redis/go-redis/v9"
+import (
+	"log"
 
-    "github.com/IonelPopJara/search-engine/services/spider/internal/pages"
-    "github.com/IonelPopJara/search-engine/services/spider/internal/utils"
-    "github.com/IonelPopJara/search-engine/services/spider/internal/crawler"
-    "github.com/IonelPopJara/search-engine/services/spider/internal/database"
+	"github.com/redis/go-redis/v9"
+
+	"github.com/IonelPopJara/search-engine/services/spider/internal/crawler"
+	"github.com/IonelPopJara/search-engine/services/spider/internal/database"
+	"github.com/IonelPopJara/search-engine/services/spider/internal/pages"
+	"github.com/IonelPopJara/search-engine/services/spider/internal/utils"
 )
 
 type PageController struct {
-    db *database.Database
+	db *database.Database
 }
 
 func NewPageController(db *database.Database) *PageController {
-    return &PageController{
-        db: db,
-    }
+	return &PageController{
+		db: db,
+	}
 }
 
 func (pgc *PageController) GetAllPages() map[string]*pages.Page {
-    log.Printf("Fetching data from Redis...\n")
-    redisPages := make(map[string]*pages.Page)
+	log.Printf("Fetching data from Redis...\n")
+	redisPages := make(map[string]*pages.Page)
 
-    keys, err := pgc.db.Client.Keys(pgc.db.Context, utils.PagePrefix + ":*").Result()
-    if err != nil {
-        log.Printf("Error fetching data from Redis: %v\n", err)
-        return nil
-    }
+	keys, err := pgc.db.Client.Keys(pgc.db.Context, utils.PagePrefix+":*").Result()
+	if err != nil {
+		log.Printf("Error fetching data from Redis: %v\n", err)
+		return nil
+	}
 
-    // Process the redis data using a pipeline
-    pipeline := pgc.db.Client.Pipeline()
-    cmds := make([]*redis.MapStringStringCmd, len(keys))
+	// Process the redis data using a pipeline
+	pipeline := pgc.db.Client.Pipeline()
+	cmds := make([]*redis.MapStringStringCmd, len(keys))
 
-    for i, key := range keys {
-        cmds[i] = pipeline.HGetAll(pgc.db.Context, key)
-    }
+	for i, key := range keys {
+		cmds[i] = pipeline.HGetAll(pgc.db.Context, key)
+	}
 
-    _, err = pipeline.Exec(pgc.db.Context)
-    if err != nil {
-        log.Printf("Error fetching data from Redis pipeline: %v" , err)
-        return nil
-    }
+	_, err = pipeline.Exec(pgc.db.Context)
+	if err != nil {
+		log.Printf("Error fetching data from Redis pipeline: %v", err)
+		return nil
+	}
 
-    for _, cmd := range cmds {
-        data, err := cmd.Result()
-        if err != nil {
-            log.Printf("Error fetching pipeline result: %v", err)
-            return nil
-        }
+	for _, cmd := range cmds {
+		data, err := cmd.Result()
+		if err != nil {
+			log.Printf("Error fetching pipeline result: %v", err)
+			return nil
+		}
 
-        page, err := pages.DehashPage(data)
-        if err != nil {
-            log.Printf("Error dehashing page from Redis: %v", err)
-            return nil
-        }
+		page, err := pages.DehashPage(data)
+		if err != nil {
+			log.Printf("Error dehashing page from Redis: %v", err)
+			return nil
+		}
 
-        redisPages[page.NormalizedURL] = page
-    }
+		redisPages[page.NormalizedURL] = page
+	}
 
-    return redisPages
+	return redisPages
 }
 
 func (pgc *PageController) SavePages(crawcfg *crawler.CrawlerConfig) {
-    data := crawcfg.Pages
-    log.Printf("Writing %d entries to the db...\n", len(data))
+	data := crawcfg.Pages
+	log.Printf("Writing %d entries to the db...\n", len(data))
 
-    // Process the redis entries using a pipeline
-    pipeline := pgc.db.Client.Pipeline()
+	// Process the redis entries using one transactional pipeline so
+	// page_data writes and pages_queue publish happen atomically.
+	pipeline := pgc.db.Client.TxPipeline()
 
-    for _, page := range data {
-        // Check if the page has not been crawled
-        // if _, exists := crawcfg.CachedPages[page.NormalizedURL]; !exists {
-        // } else {
-        //     log.Printf("Skipping %v. Already crawled\n", page.NormalizedURL)
-        // }
-        // Hash page
-        pageHash, err := pages.HashPage(page)
-        if err != nil {
-            log.Printf("Error hashing page %s: %v", page.NormalizedURL, err)
-            continue
-        }
+	type pageWriteCmd struct {
+		normalizedURL string
+		hSetCmd       *redis.IntCmd
+		lPushCmd      *redis.IntCmd
+	}
 
-        // Append command to pipeline
-        pipeline.HSet(pgc.db.Context, utils.PagePrefix + ":"+page.NormalizedURL, pageHash)
+	writeCmds := make([]pageWriteCmd, 0, len(data))
 
-        // Push to the indexer queue
-        // NOTE: For some weird reason "indexer_queue" does not work, but any other name does :/
-        // res, err := pgc.db.Client.LPush(pgc.db.Context, utils.IndexerQueueKey, utils.PagePrefix + ":" +page.NormalizedURL).Result()
-        pgc.db.Client.LPush(pgc.db.Context, utils.IndexerQueueKey, utils.PagePrefix + ":" +page.NormalizedURL).Result()
+	for _, page := range data {
+		pageHash, err := pages.HashPage(page)
+		if err != nil {
+			log.Printf("Error hashing page %s: %v", page.NormalizedURL, err)
+			continue
+		}
 
-    }
+		pageKey := utils.PagePrefix + ":" + page.NormalizedURL
+		writeCmds = append(writeCmds, pageWriteCmd{
+			normalizedURL: page.NormalizedURL,
+			hSetCmd:       pipeline.HSet(pgc.db.Context, pageKey, pageHash),
+			lPushCmd:      pipeline.LPush(pgc.db.Context, utils.IndexerQueueKey, pageKey),
+		})
+	}
 
-    // Execute the pipeline
-    _, err := pipeline.Exec(pgc.db.Context)
-    if err != nil {
-        log.Printf("Error executing pipeline: %v", err)
-    } else {
-        log.Printf("Successfully written %d entries to the db!", len(data))
-    }
+	if len(writeCmds) == 0 {
+		log.Printf("No page entries queued for persistence")
+		return
+	}
+
+	_, err := pipeline.Exec(pgc.db.Context)
+	if err != nil {
+		log.Printf("Error executing page persistence transaction: %v", err)
+		return
+	}
+
+	for _, cmd := range writeCmds {
+		if err := cmd.hSetCmd.Err(); err != nil {
+			log.Printf("HSET failed for %s: %v", cmd.normalizedURL, err)
+		}
+
+		if err := cmd.lPushCmd.Err(); err != nil {
+			log.Printf("LPUSH failed for %s: %v", cmd.normalizedURL, err)
+		}
+	}
+
+	log.Printf("Successfully written %d entries to the db!", len(writeCmds))
 }

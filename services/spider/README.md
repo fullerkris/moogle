@@ -13,6 +13,9 @@ REDIS_PORT=<your_redis_port> (default: 6379)
 REDIS_PASSWORD=<your_redis_password> (default: empty)
 REDIS_DB=<your_redis_db> (default: 0)
 STARTING_URL=<your_starting_url> (default: https://en.wikipedia.org/wiki/Kamen_Rider)
+SPIDER_HTTP_TIMEOUT_SECONDS=<request timeout in seconds> (default: 10)
+SPIDER_HTTP_MAX_BODY_BYTES=<max bytes to read per page> (default: 2097152)
+SPIDER_HTTP_USER_AGENT=<crawler user-agent string>
 ```
 
 To run the spider using Docker, follow these steps:
@@ -51,7 +54,10 @@ If you prefer to run the spider without Docker, you can do so by building and ru
    REDIS_PORT=<your_redis_port>
    REDIS_PASSWORD=<your_redis_password>
    REDIS_DB=<your_redis_db>
-   STARTING_URL=<your_starting_url>
+STARTING_URL=<your_starting_url>
+SPIDER_HTTP_TIMEOUT_SECONDS=<request timeout in seconds>
+SPIDER_HTTP_MAX_BODY_BYTES=<max bytes to read per page>
+SPIDER_HTTP_USER_AGENT=<crawler user-agent string>
    ```
 
 3. **Export environment variables**:  
