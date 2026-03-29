@@ -3,8 +3,12 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
+	"net/http"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/IonelPopJara/search-engine/services/spider/internal/controllers"
 	"github.com/IonelPopJara/search-engine/services/spider/internal/crawler"
@@ -22,6 +26,26 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+func getEnvInt(key string, fallback int) int {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		log.Printf("Invalid %s value %q. Falling back to %d", key, value, fallback)
+		return fallback
+	}
+
+	if parsed <= 0 {
+		log.Printf("Non-positive %s value %d. Falling back to %d", key, parsed, fallback)
+		return fallback
+	}
+
+	return parsed
+}
+
 func main() {
 	// Parse flags
 	maxConcurrency := flag.Int("max-concurrency", 10, "Maximum number of concurrent workers")
@@ -34,6 +58,25 @@ func main() {
 	redisPassword := getEnv("REDIS_PASSWORD", "")
 	redisDB := getEnv("REDIS_DB", "0")
 	startingURL := getEnv("STARTING_URL", "https://en.wikipedia.org/wiki/Kamen_Rider")
+	httpTimeoutSeconds := getEnvInt("SPIDER_HTTP_TIMEOUT_SECONDS", utils.DefaultHTTPTimeoutSeconds)
+	httpMaxBodyBytes := getEnvInt("SPIDER_HTTP_MAX_BODY_BYTES", utils.DefaultHTTPMaxBodyBytes)
+	httpUserAgent := getEnv("SPIDER_HTTP_USER_AGENT", utils.DefaultHTTPUserAgent)
+
+	fetchClient := &http.Client{
+		Timeout: time.Duration(httpTimeoutSeconds) * time.Second,
+		Transport: &http.Transport{
+			Proxy:               http.ProxyFromEnvironment,
+			DialContext:         (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+			TLSHandshakeTimeout: 5 * time.Second,
+			IdleConnTimeout:     30 * time.Second,
+		},
+	}
+
+	crawler.SetFetchConfig(crawler.FetchConfig{
+		Client:       fetchClient,
+		UserAgent:    httpUserAgent,
+		MaxBodyBytes: int64(httpMaxBodyBytes),
+	})
 
 	// Connect to Redis
 	db := &database.Database{}
