@@ -1,91 +1,152 @@
 # Spider
 
-This is the main actor involved in web crawling. It is responsible for fetching web pages, extracting links, and storing the data in Redis. The spider uses a breadth-first search algorithm to discover new links and stores the crawled data in Redis for fast access. The spider is designed to be simple and efficient, with a focus on educational purposes rather than production-level performance.
+The spider crawls the web using breadth-first search (BFS), extracts links and images,
+and stores crawl output in Redis for downstream services.
+
+Recent improvements in this service include:
+- Redis-backed URL deduplication and visited tracking
+- Transactional page persistence plus indexer queue publishing
+- Hardened HTTP fetching (timeouts, user-agent, response-size limits)
+- Deterministic tests with `httptest` and `miniredis`
 
 ## Setup
 
-### Using Docker
-Using Docker is the recommended way to run the spider. It allows you to run the spider in an isolated environment without worrying about dependencies or system configurations. To properly run the spider with Docker you need to add a `variables.env` file in the `services/spider` directory. The `variables.env` file should contain the following variables:
+### Environment variables
 
-```bash
+Create a `variables.env` file in `services/spider`.
+
+```env
 REDIS_HOST=<your_redis_host>
-REDIS_PORT=<your_redis_port> (default: 6379)
-REDIS_PASSWORD=<your_redis_password> (default: empty)
-REDIS_DB=<your_redis_db> (default: 0)
-STARTING_URL=<your_starting_url> (default: https://en.wikipedia.org/wiki/Kamen_Rider)
-SPIDER_HTTP_TIMEOUT_SECONDS=<request timeout in seconds> (default: 10)
-SPIDER_HTTP_MAX_BODY_BYTES=<max bytes to read per page> (default: 2097152)
-SPIDER_HTTP_USER_AGENT=<crawler user-agent string>
+REDIS_PORT=<your_redis_port>                # default: 6379
+REDIS_PASSWORD=<your_redis_password>        # default: empty
+REDIS_DB=<your_redis_db>                    # default: 0
+STARTING_URL=<your_starting_url>            # default: https://en.wikipedia.org/wiki/Kamen_Rider
+
+SPIDER_HTTP_TIMEOUT_SECONDS=<seconds>       # default: 10
+SPIDER_HTTP_MAX_BODY_BYTES=<max_bytes>      # default: 2097152 (2 MiB)
+SPIDER_HTTP_USER_AGENT=<crawler_user_agent> # default: MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)
 ```
 
-To run the spider using Docker, follow these steps:
-1. **Install Docker**: The installation instructions will depend on your operating system. You can find the installation instructions for your OS on the [Docker website](https://docs.docker.com/get-docker/).
-2. **Build the Docker image**: Navigate to the `services/spider` directory (if you're not already here) and run the following command.
-   ```bash
-   docker compose up --build
-   ```
-3. **Running in detached mode**: If you want to run the spider in the background, you can use the `-d` flag.
-   ```bash
-   docker compose up --build -d
-   ```
-4. **Scaling the spider**: If you want to run multiple instances of the spider when the spider is running under detached mode, you can use the `--scale` option.
-   ```bash
-   docker compose up --scale spider=3
-   ```
-5. **Stopping the spider**: To stop the spider, you can use the following command.
-   ```bash
-   # If you are running in detached mode
-   docker compose down
-   # If you are running in the foreground
-   Ctrl + C
-   ```
+### Using Docker
+
+Using Docker is the recommended way to run the spider.
+
+1. Install Docker for your OS from [Docker Docs](https://docs.docker.com/get-docker/).
+2. From `services/spider`, build and start:
+
+```bash
+docker compose up --build
+```
+
+Run in detached mode:
+
+```bash
+docker compose up --build -d
+```
+
+Scale spider workers (service name from `docker-compose.yml` is `spider-service`):
+
+```bash
+docker compose up --build -d --scale spider-service=3
+```
+
+Stop:
+
+```bash
+docker compose down
+```
 
 ### Without Docker
 
-If you prefer to run the spider without Docker, you can do so by building and running the Go binary directly on your system. Make sure you have Go installed (version 1.18 or higher is recommended).
+You can run the spider locally with Go.
 
-1. **Install Go**:  
-   Download and install Go from the [official website](https://go.dev/dl/).
+1. Install Go (Go 1.23+ recommended based on `go.mod`).
+2. Export env vars:
 
-2. **Set up environment variables**:  
-   Create a `variables.env` file in the `services/spider` directory with the following content (adjust values as needed):
-   ```env
-   REDIS_HOST=<your_redis_host>
-   REDIS_PORT=<your_redis_port>
-   REDIS_PASSWORD=<your_redis_password>
-   REDIS_DB=<your_redis_db>
-STARTING_URL=<your_starting_url>
-SPIDER_HTTP_TIMEOUT_SECONDS=<request timeout in seconds>
-SPIDER_HTTP_MAX_BODY_BYTES=<max bytes to read per page>
-SPIDER_HTTP_USER_AGENT=<crawler user-agent string>
-   ```
-
-3. **Export environment variables**:  
-   Before running the spider, export the variables in your shell:
-   ```bash
-   export $(grep -v '^#' variables.env | xargs)
-   ```
-
-4. **Build the spider**:  
-   Navigate to the `services/spider` directory and run:
-   ```bash
-   go build -o spider ./cmd/spider
-   ```
-
-5. **Run the spider**:  
-   Start the spider with optional flags for concurrency and batch size:
-   ```bash
-   ./spider -max-concurrency=10 -max-pages=100
-   ```
-
-6. **Stopping the spider**:  
-   Press `Ctrl + C` in the terminal to stop the process.
-
-**Note:**  
-- Make sure Redis is running and accessible with the credentials you provided.
-- You may need to install Go dependencies using `go mod tidy` before building.
-
-For development or debugging, you can also run the spider directly:
 ```bash
-go run
+export $(grep -v '^#' variables.env | xargs)
 ```
+
+3. Build:
+
+```bash
+go build -o spider ./cmd/spider
+```
+
+4. Run:
+
+```bash
+./spider -max-concurrency=10 -max-pages=100
+```
+
+For development, you can run directly:
+
+```bash
+go run ./cmd/spider -max-concurrency=10 -max-pages=100
+```
+
+## Crawl state and Redis keys
+
+The spider tracks URL lifecycle in Redis with separate keys for dedupe and completion.
+
+| Key | Type | Purpose |
+|---|---|---|
+| `spider_queue` | ZSET | Crawl frontier ordered by score/depth |
+| `spider_seen_urls` | SET | Global dedupe for normalized URLs |
+| `spider_visited_urls` | SET | URLs successfully crawled |
+| `normalized_url:<normalized_url>` | HASH | URL lookup metadata (`raw_url`, `visited`) |
+| `page_data:<normalized_url>` | HASH | Serialized page data consumed by indexer |
+| `pages_queue` | LIST | Queue of page keys consumed by indexer |
+
+### URL lifecycle
+
+1. `PushURL(rawURL, score)` strips and normalizes the URL.
+2. A Redis Lua script atomically:
+   - checks membership in `spider_seen_urls`
+   - stores URL lookup metadata (`raw_url`, `visited=0`)
+   - enqueues unseen normalized URL in `spider_queue`
+3. Worker pops from `spider_queue`, fetches/parses, and on success marks visited:
+   - adds normalized URL to `spider_visited_urls`
+   - updates `normalized_url:*` hash (`visited=1`)
+
+## Persistence and queue consistency
+
+Page persistence is batched in a Redis transaction pipeline. For each page, spider writes
+`page_data:<normalized_url>` and publishes that key to `pages_queue` in the same transaction,
+which reduces queue/data drift risk.
+
+## Fetch behavior and hardening
+
+For each URL, the spider uses a configured HTTP client with protective limits:
+
+- Request timeout from `SPIDER_HTTP_TIMEOUT_SECONDS`
+- `User-Agent` header from `SPIDER_HTTP_USER_AGENT`
+- Content-type gate for HTML responses only (`text/html`)
+- Max response body size from `SPIDER_HTTP_MAX_BODY_BYTES`
+- Non-2xx/3xx responses are treated as fetch errors and skipped
+
+## Testing
+
+Run all spider tests from `services/spider`:
+
+```bash
+go test ./...
+```
+
+Run focused suites:
+
+```bash
+go test ./internal/database -run "TestPushURLDedupAndRawMapping|TestVisitPageAndSeenDedup" -v
+go test ./internal/controllers -run TestSavePagesWritesPageDataAndIndexerQueue -v
+go test ./internal/crawler -run TestGetPageData -v
+```
+
+Testing strategy:
+- `httptest` for deterministic HTTP fetch behavior (timeouts, status, content-type, size limit)
+- `miniredis` for deterministic Redis behavior (dedupe, visited markers, queue contract)
+
+## Notes
+
+- Make sure Redis is running and reachable with the configured credentials.
+- If dependencies are missing locally, run `go mod tidy`.
+- Current dedupe behavior is strict for seen URLs; recrawl scheduling/TTL is a future enhancement.
