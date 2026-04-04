@@ -78,5 +78,29 @@ The current diagram is not the updated one, but it gives a good overview of the 
 - Read each service's README file for specific setup instructions.
 - Follow the instructions in the README files to set up each service.
 
+### Full-stack Docker orchestration (crawler-first pipeline)
+
+For local end-to-end runs, use the repo script:
+
+```bash
+scripts/fullstack.sh up
+```
+
+Other operations:
+
+```bash
+scripts/fullstack.sh logs           # recent logs for infra + services
+scripts/fullstack.sh logs spider    # follow one service
+scripts/fullstack.sh down
+scripts/fullstack.sh reset          # down + remove Redis/Mongo volumes
+
+# sample crawl throughput over 90s (while stack is running)
+scripts/benchmark-crawler.sh --duration 90 --interval 10
+```
+
+Requirements:
+- Create `variables.env` for each service under `services/*/` (spider/indexer/image-indexer/backlinks-processor/page-rank/tfidf).
+- Shared infra is started by script (`redis`, `mongo`). For container-to-container access, service env should point to these hosts (for example `REDIS_HOST=redis`, and equivalent Mongo host/URI using `mongo`).
+
 ## Notes
 The documentation is a work in progress. I'll update it once I finish writing my thesis. For now, please refer to the code and comments in each service for more information on how to use them.
