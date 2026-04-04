@@ -10,6 +10,13 @@ const (
 	MaxScore = 10000
 	MinScore = -1000
 
+	// Frontier scoring constants
+	FrontierDepthFractionBase = 0.05
+	FrontierPenaltyScale      = 0.85
+	FrontierDefaultPenalty    = 0.65
+	FrontierTieBreakerScale   = 0.01
+	FrontierTieBreakerBuckets = 1000
+
 	DefaultHTTPTimeoutSeconds = 10
 	DefaultHTTPMaxBodyBytes   = 2 * 1024 * 1024 // 2 MiB
 	DefaultHTTPUserAgent      = "MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)"
