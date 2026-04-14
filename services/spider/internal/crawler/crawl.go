@@ -95,20 +95,17 @@ func (crawcfg *CrawlerConfig) Crawl(db *database.Database) {
 				continue
 			}
 
-			// Check if the thing exists in the queue, and update weight
-			score, exists := db.ExistsInQueue(rawCurrentLink)
-			if exists {
-				// NOTE: I decided to disable this for now.
-				// I'll see how it performs without it.
-				// score -= 0.001
-			} else {
-				score = depthLevel + 1
-			}
+			scoreDetails := computeFrontierScore(depthLevel, rawCurrentLink)
+			score := scoreDetails.Score
 
 			score = math.Max(utils.MinScore, math.Min(score, utils.MaxScore))
 
-			// Update score based on depth
-			_ = db.PushURL(rawCurrentLink, score)
+			log.Printf("Frontier score url=%s depth=%.0f penalty=%.3f tie=%.4f score=%.4f", rawCurrentLink, scoreDetails.Depth, scoreDetails.Penalty, scoreDetails.TieBreaker, score)
+
+			// Update score based on depth + heuristic quality
+			if err := db.PushURL(rawCurrentLink, score); err != nil {
+				log.Printf("Error enqueueing %v with score %.4f: %v", rawCurrentLink, score, err)
+			}
 		}
 	}
 }
