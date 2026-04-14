@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,6 +54,7 @@ func main() {
 	flag.Parse()
 
 	// Retrieve environment variables
+	pipelineRedisURL := strings.TrimSpace(os.Getenv("PIPELINE_REDIS_URL"))
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
@@ -80,7 +82,13 @@ func main() {
 
 	// Connect to Redis
 	db := &database.Database{}
-	err := db.ConnectToRedis(redisHost, redisPort, redisPassword, redisDB)
+	var err error
+	if pipelineRedisURL != "" {
+		err = db.ConnectToRedisURL(pipelineRedisURL)
+	} else {
+		log.Println("PIPELINE_REDIS_URL not set, falling back to REDIS_HOST/REDIS_PORT")
+		err = db.ConnectToRedis(redisHost, redisPort, redisPassword, redisDB)
+	}
 	if err != nil {
 		log.Printf("Error: %v\n", err)
 		return

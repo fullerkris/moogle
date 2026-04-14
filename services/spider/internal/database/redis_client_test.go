@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -116,5 +117,20 @@ func TestVisitPageAndSeenDedup(t *testing.T) {
 
 	if got != 0 {
 		t.Fatalf("expected no re-enqueue for seen URL, got queue size %d", got)
+	}
+}
+
+func TestConnectToRedisURL(t *testing.T) {
+	redisServer, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer redisServer.Close()
+
+	redisURL := fmt.Sprintf("redis://%s/0", redisServer.Addr())
+
+	db := &Database{}
+	if err := db.ConnectToRedisURL(redisURL); err != nil {
+		t.Fatalf("failed to connect using redis url: %v", err)
 	}
 }

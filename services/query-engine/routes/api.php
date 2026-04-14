@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\DB;
 
 use App\Http\Controllers\QuerySearchController;
 use App\Http\Controllers\RedisController;
+use App\Http\Controllers\HealthController;
+
+Route::get('/health/live', [HealthController::class, 'live']);
+Route::get('/health/ready', [HealthController::class, 'ready']);
 
 Route::get('/search', [QuerySearchController::class, 'search'])->middleware([FuzzySearch::class, StoreSearchTerm::class]);
 Route::get('/search_images', [QuerySearchController::class, 'search_images']);

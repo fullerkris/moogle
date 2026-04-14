@@ -38,25 +38,59 @@ def handle_exit(signum, frame):
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)
 
-if __name__ == "__main__":
-    # REDIS ENV VARIABLES
-    redis_host = os.getenv("REDIS_HOST", "localhost")
-    redis_port = int(os.getenv("REDIS_PORT", 6379))
-    redis_password = os.getenv("REDIS_PASSWORD", None)
-    redis_db = int(os.getenv("REDIS_DB", 0))
 
-    # MONGO ENV VARIABLES
+def _parse_int_env(name, value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be an integer, got {value!r}")
+
+
+def get_redis_config():
+    pipeline_redis_url = os.getenv("PIPELINE_REDIS_URL", "").strip()
+    if pipeline_redis_url:
+        logger.info("Using PIPELINE_REDIS_URL for Redis connection")
+        return {"redis_url": pipeline_redis_url}
+
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port_raw = os.getenv("REDIS_PORT", "6379")
+
+    redis_password = os.getenv("REDIS_PASSWORD", None)
+    redis_db_raw = os.getenv("REDIS_DB", "0")
+
+    logger.info("Using REDIS_HOST/REDIS_PORT fallback for Redis connection")
+    return {
+        "host": redis_host,
+        "port": _parse_int_env("REDIS_PORT", redis_port_raw),
+        "password": redis_password,
+        "db": _parse_int_env("REDIS_DB", redis_db_raw),
+    }
+
+
+def get_mongo_config():
     mongo_host = os.getenv("MONGO_HOST", "localhost")
-    mongo_port = int(os.getenv("MONGO_PORT", 27017))
-    mongo_password = os.getenv("MONGO_PASSWORD", None)
+    mongo_port_raw = os.getenv("MONGO_PORT", "27017")
     mongo_db = os.getenv("MONGO_DB", "test")
-    mongo_username = os.getenv("MONGO_USERNAME", "")
+
+    return {
+        "host": mongo_host,
+        "port": _parse_int_env("MONGO_PORT", mongo_port_raw),
+        "password": os.getenv("MONGO_PASSWORD", None),
+        "db": mongo_db,
+        "username": os.getenv("MONGO_USERNAME", ""),
+    }
+
+if __name__ == "__main__":
+    try:
+        redis_config = get_redis_config()
+        mongo_config = get_mongo_config()
+    except ValueError as e:
+        logger.error(f"Invalid startup configuration: {e}")
+        sys.exit(1)
 
     # CONNECT TO REDIS
     logger.info("Initializing Redis...")
-    redis = RedisClient(
-        host=redis_host, port=redis_port, password=redis_password, db=redis_db
-    )
+    redis = RedisClient(**redis_config)
 
     if not redis.client or redis.client is None:
         logger.error("Could not initialize Redis...")
@@ -65,13 +99,7 @@ if __name__ == "__main__":
 
     # CONNECT TO MONGO
     logger.info("Initializing Mongo...")
-    mongo = MongoClient(
-        host=mongo_host,
-        port=mongo_port,
-        password=mongo_password,
-        db=mongo_db,
-        username=mongo_username,
-    )
+    mongo = MongoClient(**mongo_config)
 
     if not mongo.client or mongo.client is None:
         logger.error("Could not initialize Mongo...")

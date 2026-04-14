@@ -16,16 +16,28 @@ logger = logging.getLogger(__name__)
 
 class RedisClient:
     def __init__(
-        self, host="localhost", port=6379, password="", db=0, decode_responses=True
+        self,
+        host="localhost",
+        port=6379,
+        password="",
+        db=0,
+        decode_responses=True,
+        redis_url=None,
     ):
         try:
-            self.client = redis.Redis(
-                host=host,
-                port=port,
-                password=password,
-                db=db,
-                decode_responses=decode_responses,
-            )
+            if redis_url:
+                self.client = redis.Redis.from_url(
+                    redis_url,
+                    decode_responses=decode_responses,
+                )
+            else:
+                self.client = redis.Redis(
+                    host=host,
+                    port=port,
+                    password=password,
+                    db=db,
+                    decode_responses=decode_responses,
+                )
 
             self.client.ping()
             logger.info("Successfully connected to redis!")
