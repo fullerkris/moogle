@@ -1,0 +1,71 @@
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - laravel
+    restart: unless-stopped
+    networks:
+      - edge
+      - app
+
+  laravel:
+    image: query-engine-image:latest
+    env_file:
+      - ../../services/query-engine/.env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      QUERY_REDIS_URL: redis://query-redis:6379/0
+      CACHE_REDIS_URL: redis://query-redis:6379/1
+      MONGODB_URI: mongodb://moogle:change-me@mongo:27017/moogle?authSource=admin
+      MONGODB_DATABASE: moogle
+    depends_on:
+      - query-redis
+      - mongo
+    restart: unless-stopped
+    networks:
+      - app
+
+  query-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    volumes:
+      - query_redis_data:/data
+    networks:
+      - app
+
+  pipeline-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    volumes:
+      - pipeline_redis_data:/data
+    networks:
+      - app
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: moogle
+      MONGO_INITDB_ROOT_PASSWORD: change-me
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app
+
+networks:
+  edge:
+    driver: bridge
+  app:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  query_redis_data:
+  pipeline_redis_data:

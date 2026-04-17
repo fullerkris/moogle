@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pipeline-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pipeline-redis
+  template:
+    metadata:
+      labels:
+        app: pipeline-redis
+    spec:
+      containers:
+        - name: pipeline-redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 10
+            periodSeconds: 20

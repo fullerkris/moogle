@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+nameSuffix: -prod
+
+patches:
+  - target:
+      kind: Ingress
+      name: moogle-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: moogle.example.com
+  - target:
+      kind: Deployment
+      name: query-engine
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: Deployment
+      name: query-engine-caddy
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
