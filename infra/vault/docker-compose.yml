@@ -1,0 +1,16 @@
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: moogle-vault
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./config:/vault/config
+      - vault-data:/vault/file
+    command: vault server -config=/vault/config/vault.hcl
+    restart: unless-stopped
+
+volumes:
+  vault-data:
