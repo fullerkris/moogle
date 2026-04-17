@@ -1,0 +1,188 @@
+name: Required Checks
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: required-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  required-tests:
+    name: required-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+
+      - name: Test spider service
+        working-directory: ./services/spider
+        run: go test ./...
+
+      - name: Test page-rank service
+        working-directory: ./services/page-rank
+        run: go test ./...
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python modules
+        run: |
+          python -m py_compile services/indexer/main.py services/indexer/data/redis_client.py
+          python -m py_compile services/image-indexer/main.py services/image-indexer/data/redis_client.py
+          python -m py_compile services/backlinks-processor/main.py services/backlinks-processor/data/redis_client.py
+          python -m py_compile services/tfidf/main.py services/tfidf/data/mongo_client.py
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test monitoring service
+        working-directory: ./services/monitoring
+        run: cargo test --locked
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer
+
+      - name: Lint query-engine PHP entrypoints
+        run: |
+          php -l services/query-engine/routes/api.php
+          if [ -f services/query-engine/app/Http/Controllers/HealthController.php ]; then
+            php -l services/query-engine/app/Http/Controllers/HealthController.php
+          fi
+
+  required-build:
+    name: required-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+
+      - name: Build spider binary
+        working-directory: ./services/spider
+        run: go build -v ./cmd/spider
+
+      - name: Build page-rank binary
+        working-directory: ./services/page-rank
+        run: go build -v ./cmd/page-rank
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/indexer/requirements.txt
+          pip install -r services/image-indexer/requirements.txt
+          pip install -r services/backlinks-processor/requirements.txt
+          pip install -r services/tfidf/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build client assets
+        working-directory: ./services/client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build query-engine frontend assets
+        working-directory: ./services/query-engine
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build monitoring service
+        working-directory: ./services/monitoring
+        run: cargo build --locked
+
+  required-vulnerability-scan:
+    name: required-vulnerability-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan (critical vulnerabilities)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL
+          exit-code: 1
+
+  required-smoke:
+    name: required-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate compose files
+        run: |
+          docker compose -f services/spider/docker-compose.yml config >/dev/null
+          docker compose -f services/indexer/docker-compose.yml config >/dev/null
+          docker compose -f services/image-indexer/docker-compose.yml config >/dev/null
+          docker compose -f services/backlinks-processor/docker-compose.yml config >/dev/null
+          docker compose -f services/tfidf/docker-compose.yml config >/dev/null
+          docker compose -f services/page-rank/docker-compose.yml config >/dev/null
+          docker compose -f services/query-engine/docker-compose.yml config >/dev/null
+          if [ -f scripts/docker/infra.compose.yml ]; then
+            docker compose -f scripts/docker/infra.compose.yml config >/dev/null
+          fi
+
+      - name: Start query-engine stack
+        working-directory: ./services/query-engine
+        run: docker compose up -d --build
+
+      - name: Verify query-engine is reachable
+        run: |
+          for _ in {1..60}; do
+            code="$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ || true)"
+            if [ "${code}" != "000" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker compose -f services/query-engine/docker-compose.yml logs --tail=100
+          exit 1
+
+      - name: Verify health endpoint status contract
+        run: |
+          health_code="$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/health/live || true)"
+          if [ "${health_code}" != "200" ] && [ "${health_code}" != "404" ]; then
+            echo "Unexpected health endpoint status: ${health_code}"
+            exit 1
+          fi
+
+      - name: Shutdown query-engine stack
+        if: always()
+        working-directory: ./services/query-engine
+        run: docker compose down --remove-orphans
