@@ -1,0 +1,54 @@
+groups:
+  - name: moogle-api-alerts
+    rules:
+      - alert: QueryEngineHigh5xxRate
+        expr: sum(rate(http_requests_total{job="query-engine",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{job="query-engine"}[5m])), 1) > 0.03
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Query-engine 5xx rate above 3%"
+
+      - alert: QueryEngineHighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="query-engine"}[5m])) by (le)) > 0.8
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Query-engine p95 latency above 800ms"
+
+  - name: moogle-pipeline-alerts
+    rules:
+      - alert: PipelineQueueBacklogHigh
+        expr: max(queue_depth{queue="pages_queue"}) > 50000
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pipeline queue depth above 50k for 15m"
+
+      - alert: PipelineMessageAgeHigh
+        expr: max(queue_oldest_message_age_seconds) > 900
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Oldest queue message older than 15 minutes"
+
+  - name: moogle-infra-alerts
+    rules:
+      - alert: RedisMemoryHigh
+        expr: max(redis_memory_used_bytes / redis_memory_max_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis memory utilization above 90%"
+
+      - alert: BackupFreshnessMissing
+        expr: time() - max(backup_last_success_timestamp_seconds) > 93600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful backup in the last 26 hours"
