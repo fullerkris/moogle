@@ -8,6 +8,7 @@ Recent improvements in this service include:
 - Transactional page persistence plus indexer queue publishing
 - Hardened HTTP fetching (timeouts, user-agent, response-size limits)
 - Deterministic tests with `httptest` and `miniredis`
+- Heuristic frontier scoring (crawler-first) with near-BFS depth ordering
 
 ## Setup
 
@@ -98,6 +99,22 @@ The spider tracks URL lifecycle in Redis with separate keys for dedupe and compl
 | `page_data:<normalized_url>` | HASH | Serialized page data consumed by indexer |
 | `pages_queue` | LIST | Queue of page keys consumed by indexer |
 
+## Frontier scoring (crawler-first)
+
+The spider still uses `spider_queue` as a Redis `ZSET`, where lower score means higher priority (`BZPopMin`).
+
+Scoring is now:
+
+`next_depth + fractional_penalty`
+
+- `next_depth` is computed as `floor(parent_score) + 1` to preserve near-BFS behavior across layers.
+- `fractional_penalty` is heuristic-only (no static whitelist/blacklist):
+  - domain/TLD quality signals (`.edu`, `.gov`, `.org`, noisy/low-quality TLDs, host complexity)
+  - URL shape signals (query presence, deep paths, noisy host tokens)
+  - deterministic tie-breaker hash for stable ordering inside the same depth
+
+This is additive and Redis-safe: key names/contracts for downstream indexers are unchanged.
+
 ### URL lifecycle
 
 1. `PushURL(rawURL, score)` strips and normalizes the URL.
@@ -139,6 +156,7 @@ Run focused suites:
 go test ./internal/database -run "TestPushURLDedupAndRawMapping|TestVisitPageAndSeenDedup" -v
 go test ./internal/controllers -run TestSavePagesWritesPageDataAndIndexerQueue -v
 go test ./internal/crawler -run TestGetPageData -v
+go test ./internal/crawler -run TestComputeFrontierScore -v
 ```
 
 Testing strategy:

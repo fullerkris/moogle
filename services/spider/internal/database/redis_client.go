@@ -38,32 +38,43 @@ type Database struct {
 	Context context.Context
 }
 
-func (db *Database) ConnectToRedis(redisHost, redisPort, redisPassword, redisDB string) error {
-	log.Println("Connecting to Redis...")
-	// log.Printf("\tRedis Host: '%s'\n", redisHost+":"+redisPort)
-	// log.Printf("\tRedis Password: '%s'\n", redisPassword)
-	// log.Printf("\tRedis DB: '%s'\n", redisDB)
-
-	dbIndex, err := strconv.Atoi(redisDB)
-	if err != nil {
-		return fmt.Errorf("Could not parse DB value: %v\n", err)
-	}
-
-	db.Client = redis.NewClient(&redis.Options{
-		Addr:     redisHost + ":" + redisPort,
-		Password: redisPassword,
-		DB:       dbIndex,
-	})
-
+func (db *Database) connectRedis(options *redis.Options) error {
+	db.Client = redis.NewClient(options)
 	db.Context = context.Background()
 
-	_, err = db.Client.Ping(db.Context).Result()
+	_, err := db.Client.Ping(db.Context).Result()
 	if err != nil {
-		return fmt.Errorf("Couldn't connect to shit [%v, %v]: %v", redisHost, redisPassword, err)
+		return fmt.Errorf("could not connect to redis at %q: %w", options.Addr, err)
 	}
 
 	log.Println("Successfully connected to Redis!")
 	return nil
+}
+
+func (db *Database) ConnectToRedis(redisHost, redisPort, redisPassword, redisDB string) error {
+	log.Println("Connecting to Redis...")
+
+	dbIndex, err := strconv.Atoi(redisDB)
+	if err != nil {
+		return fmt.Errorf("could not parse DB value: %w", err)
+	}
+
+	return db.connectRedis(&redis.Options{
+		Addr:     redisHost + ":" + redisPort,
+		Password: redisPassword,
+		DB:       dbIndex,
+	})
+}
+
+func (db *Database) ConnectToRedisURL(redisURL string) error {
+	log.Println("Connecting to Redis using PIPELINE_REDIS_URL...")
+
+	options, err := redis.ParseURL(redisURL)
+	if err != nil {
+		return fmt.Errorf("could not parse PIPELINE_REDIS_URL: %w", err)
+	}
+
+	return db.connectRedis(options)
 }
 
 // ------------------- REDIS SETUP -------------------
