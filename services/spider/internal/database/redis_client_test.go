@@ -134,3 +134,11 @@ func TestConnectToRedisURL(t *testing.T) {
 		t.Fatalf("failed to connect using redis url: %v", err)
 	}
 }
+
+func TestConnectToRedisURLInvalid(t *testing.T) {
+	db := &Database{}
+	err := db.ConnectToRedisURL("not-a-valid-redis-url")
+	if err == nil {
+		t.Fatalf("expected invalid redis url error, got nil")
+	}
+}
