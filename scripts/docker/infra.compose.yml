@@ -1,6 +1,17 @@
 services:
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - "1024mb"
+      - --maxmemory-policy
+      - noeviction
     ports:
       - "6379:6379"
     volumes:
@@ -8,6 +19,7 @@ services:
 
   mongo:
     image: mongo:7
+    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:

@@ -127,20 +127,17 @@ func main() {
 		}
 
 		if queueSize >= utils.MaxIndexerQueueSize {
-			log.Printf("Indexer queue is full. Waiting...\n")
-			// Wait until we receive a signal to start crawling again
-			for {
-				sig, err := db.PopSignalQueue()
+			resumeThreshold := int64(utils.MaxIndexerQueueSize - 500)
+			log.Printf("Indexer queue is full (%d). Waiting for it to drain below %d...\n", queueSize, resumeThreshold)
+			for queueSize >= resumeThreshold {
+				time.Sleep(5 * time.Second)
+				queueSize, err = db.GetIndexerQueueSize()
 				if err != nil {
-					log.Printf("could not get signal: %v\n", err)
+					log.Printf("Error getting indexer queue while waiting: %v\n", err)
 					return
 				}
-
-				if sig == utils.ResumeCrawl {
-					log.Printf("Resume crawl!\n")
-					break
-				}
 			}
+			log.Printf("Indexer queue drained to %d. Resuming crawl.\n", queueSize)
 		}
 
 		log.Printf("Spawning workers...\n")

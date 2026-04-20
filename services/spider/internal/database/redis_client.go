@@ -20,6 +20,14 @@ local urlLookupKey = KEYS[3]
 local normalizedURL = ARGV[1]
 local rawURL = ARGV[2]
 local score = tonumber(ARGV[3])
+local maxQueueSize = tonumber(ARGV[4])
+
+if maxQueueSize and maxQueueSize > 0 then
+    local currentQueueSize = redis.call("ZCARD", queueKey)
+    if currentQueueSize >= maxQueueSize then
+        return -1
+    end
+end
 
 if redis.call("SISMEMBER", seenKey, normalizedURL) == 1 then
     return 0
@@ -104,10 +112,15 @@ func (db *Database) PushURL(rawURL string, score float64) error {
 		normalizedURL,
 		rawURL,
 		score,
+		utils.MaxSpiderQueueSize,
 	).Int()
 
 	if err != nil {
 		return fmt.Errorf("Could not add URL to queue: %w", err)
+	}
+
+	if res == -1 {
+		return nil
 	}
 
 	if res == 0 {

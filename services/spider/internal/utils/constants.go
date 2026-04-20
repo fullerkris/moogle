@@ -31,6 +31,7 @@ const (
 	VisitedURLsKey      = "spider_visited_urls"
 	ResumeCrawl         = "RESUME_CRAWL"
 	MaxIndexerQueueSize = 5000
+	MaxSpiderQueueSize  = 300000
 
 	// Redis Data: some keys stay in Redis indefinitely, while others are transfer to MongoDB by other services
 	NormalizedURLPrefix = "normalized_url" // Stays in Redis indefinitely
