@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: moogle-local
+  labels:
+    app.kubernetes.io/name: prometheus-local
+spec:
+  serviceAccountName: prometheus-local
+  replicas: 1
+  retention: 24h
+  scrapeInterval: 30s
+  evaluationInterval: 30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  serviceMonitorSelector: {}

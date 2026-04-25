@@ -216,3 +216,7 @@ variables.env
 
 .vscode
 certbot
+
+# Local Kubernetes credentials
+k8s/kubeconfig.local.yaml
+k8s/*-ca.crt

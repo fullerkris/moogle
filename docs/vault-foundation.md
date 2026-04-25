@@ -62,7 +62,9 @@ Run production compose using Vault-injected secrets:
 ./scripts/vault/run-prod-compose.sh staging up -d
 ```
 
-This wrapper loads shared + service secrets and runs `deploy/compose/docker-compose.prod.yml` without relying on checked-in `.env` files.
+This wrapper loads shared + service secrets and runs `deploy/compose/docker-compose.prod.yml` (query-engine + pipeline services) without relying on checked-in `.env` files.
+
+The local bootstrap seeds shared Redis/Mongo URLs using `*.internal` hostnames, and production compose exposes matching network aliases so VM rollout uses the same secret contract.
 
 ## Kubernetes Migration Path
 
@@ -76,6 +78,9 @@ This wrapper loads shared + service secrets and runs `deploy/compose/docker-comp
 - Production Vault must run with TLS, KMS auto-unseal, audit logging, and policy least privilege.
 - Required secret contract for production compose includes:
   - `APP_KEY`, `APP_URL`
-  - `QUERY_REDIS_URL`, `CACHE_REDIS_URL`
+  - `PIPELINE_REDIS_URL`, `QUERY_REDIS_URL`, `CACHE_REDIS_URL`
   - `MONGODB_URI`, `MONGODB_DATABASE`
   - `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`
+  - `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USERNAME`, `MONGO_PASSWORD`
+  - `SPIDER_STARTING_URL`, `SPIDER_HTTP_TIMEOUT_SECONDS`, `SPIDER_HTTP_MAX_BODY_BYTES`, `SPIDER_HTTP_USER_AGENT`
+  - `TFIDF_OPERATIONS_THRESHOLD`, `TFIDF_NUM_THREADS`

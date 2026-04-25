@@ -8,6 +8,20 @@ services:
     depends_on:
       - laravel
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "caddy version >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
     networks:
       - edge
       - app
@@ -27,6 +41,195 @@ services:
       - query-redis
       - mongo
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "php -v >/dev/null 2>&1 && test -f /var/www/public/build/manifest.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - app
+
+  spider:
+    image: ghcr.io/ionelpopjara/moogle/spider:latest
+    environment:
+      PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:?set PIPELINE_REDIS_URL}
+      STARTING_URL: ${SPIDER_STARTING_URL:-https://en.wikipedia.org/wiki/Web_crawler}
+      SPIDER_HTTP_TIMEOUT_SECONDS: ${SPIDER_HTTP_TIMEOUT_SECONDS:-10}
+      SPIDER_HTTP_MAX_BODY_BYTES: ${SPIDER_HTTP_MAX_BODY_BYTES:-2097152}
+      SPIDER_HTTP_USER_AGENT: "${SPIDER_HTTP_USER_AGENT:-MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)}"
+    depends_on:
+      - pipeline-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q spider"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - app
+
+  indexer:
+    image: ghcr.io/ionelpopjara/moogle/indexer:latest
+    environment:
+      PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:?set PIPELINE_REDIS_URL}
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_DB: ${MONGO_DB:-moogle}
+      MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+    depends_on:
+      - pipeline-redis
+      - mongo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q main.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - app
+
+  image-indexer:
+    image: ghcr.io/ionelpopjara/moogle/image-indexer:latest
+    environment:
+      PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:?set PIPELINE_REDIS_URL}
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_DB: ${MONGO_DB:-moogle}
+      MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+    depends_on:
+      - pipeline-redis
+      - mongo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q main.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - app
+
+  backlinks-processor:
+    image: ghcr.io/ionelpopjara/moogle/backlinks-processor:latest
+    environment:
+      PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:?set PIPELINE_REDIS_URL}
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_DB: ${MONGO_DB:-moogle}
+      MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+    depends_on:
+      - pipeline-redis
+      - mongo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q main.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - app
+
+  tfidf:
+    image: ghcr.io/ionelpopjara/moogle/tfidf:latest
+    environment:
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_DB: ${MONGO_DB:-moogle}
+      MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+      OPERATIONS_THRESHOLD: ${TFIDF_OPERATIONS_THRESHOLD:-1000}
+      NUM_THREADS: ${TFIDF_NUM_THREADS:-4}
+    depends_on:
+      - mongo
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q main.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+        reservations:
+          cpus: "0.20"
+          memory: 192M
+    networks:
+      - app
+
+  page-rank:
+    image: ghcr.io/ionelpopjara/moogle/page-rank:latest
+    environment:
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_DB: ${MONGO_DB:-moogle}
+      MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+    depends_on:
+      - mongo
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q page-rank"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+        reservations:
+          cpus: "0.20"
+          memory: 192M
     networks:
       - app
 
@@ -34,19 +237,51 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
     volumes:
       - query_redis_data:/data
     networks:
-      - app
+      app:
+        aliases:
+          - query-redis.internal
 
   pipeline-redis:
     image: redis:7-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
     volumes:
       - pipeline_redis_data:/data
     networks:
-      - app
+      app:
+        aliases:
+          - pipeline-redis.internal
 
   mongo:
     image: mongo:7
@@ -54,10 +289,26 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?set MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     volumes:
       - mongo_data:/data/db
     networks:
-      - app
+      app:
+        aliases:
+          - mongo.internal
 
 networks:
   edge:

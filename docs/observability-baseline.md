@@ -24,10 +24,24 @@ docker compose -f observability/docker-compose.yml up -d
 If your cluster uses Prometheus Operator, apply ServiceMonitor resources:
 
 ```bash
-kubectl apply -k k8s/monitoring-operator
+scripts/kubectl-with-config.sh k8s/kubeconfig.local.yaml apply -k k8s/monitoring-operator
 ```
 
-This switches scrape discovery from annotation-only to explicit ServiceMonitor resources.
+If Prometheus CRDs were installed after the operator pod started, restart the operator once so all controllers initialize:
+
+```bash
+scripts/kubectl-with-config.sh k8s/kubeconfig.local.yaml rollout restart deployment/prometheus-operator -n default
+```
+
+This now applies:
+
+- ServiceMonitor resources for `query-engine-metrics` and `runtime-metrics`.
+- A minimal local `Prometheus` custom resource (`moogle-local`) that scrapes ServiceMonitors in namespace `moogle`.
+- Namespaced RBAC (`ServiceAccount`/`Role`/`RoleBinding`) for service/endpoints/pod discovery.
+
+Follow-up tuning:
+
+- Revisit Prometheus retention/storage and resource limits for non-local environments.
 
 ## Alert Baseline Targets
 

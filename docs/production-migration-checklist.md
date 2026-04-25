@@ -2,6 +2,9 @@
 
 This checklist converts the Senior Developer + Backend Architect hardening guidance into concrete, repo-specific execution steps.
 
+Status note: boxes marked `[x]` are implemented in this repository baseline; operational/run-time checks are intentionally left `[ ]` until executed in environment.
+Tagging note: unchecked items with `(partial: ...)` have some implementation in-repo but still need completion/validation.
+
 ## Approved Migration Defaults
 
 - Platform targets: support both VM deployments (Docker Compose) and Kubernetes deployments.
@@ -26,30 +29,30 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 
 ### 1) Production Runtime Mode Only
 
-- [ ] Disable dev workflows in production (`npm run dev`, Vite hot mode, `APP_DEBUG=true`).
-- [ ] Build frontend assets in image build stage and verify `public/build/manifest.json` exists in final image.
-- [ ] Set Laravel prod env: `APP_ENV=production`, `APP_DEBUG=false`.
+- [x] Disable dev workflows in production (`npm run dev`, Vite hot mode, `APP_DEBUG=true`).
+- [x] Build frontend assets in image build stage and verify `public/build/manifest.json` exists in final image.
+- [x] Set Laravel prod env: `APP_ENV=production`, `APP_DEBUG=false`.
 
 ### 2) Network and Access Hardening
 
-- [ ] Expose only ingress/reverse proxy (80/443) to public network.
-- [ ] VM ingress standard: Caddy edge reverse proxy with hardened TLS config.
-- [ ] Kubernetes ingress standard: NGINX Ingress Controller + cert-manager.
-- [ ] Keep MongoDB and Redis internal-only (no public port mappings in prod).
+- [ ] Expose only ingress/reverse proxy (80/443) to public network. (partial: ingress baselines exist in VM/K8s manifests; environment exposure policy still needs runtime validation.)
+- [ ] VM ingress standard: Caddy edge reverse proxy with hardened TLS config. (partial: Caddy baseline and hardening headers exist; TLS termination/HTTPS redirect still pending in deploy config.)
+- [ ] Kubernetes ingress standard: NGINX Ingress Controller + cert-manager. (partial: `ingressClassName: nginx` is set; cert-manager wiring is not present yet.)
+- [x] Keep MongoDB and Redis internal-only (no public port mappings in prod).
 - [ ] Add network segmentation so pipeline workers cannot access query-only Redis/cache unless required.
 
 ### 3) Secrets and Credentials
 
-- [ ] Move production secrets out of checked-in `.env` files.
-- [ ] Use Vault as source-of-truth for Mongo/Redis credentials and keys.
+- [ ] Move production secrets out of checked-in `.env` files. (partial: production compose now uses env contracts instead of checked-in env files; remaining rollout needs environment-wide validation.)
+- [ ] Use Vault as source-of-truth for Mongo/Redis credentials and keys. (partial: Vault bootstrap/export scripts + `run-prod-compose.sh` exist for query + pipeline runtime paths; environment adoption and rotation evidence remain.)
 - [ ] Separate DB users by role (query read-only vs pipeline write users).
-- [ ] Enforce 180-day secret rotation schedule with owner + runbook.
+- [ ] Enforce 180-day secret rotation schedule with owner + runbook. (partial: policy and runbook are documented; automated enforcement/evidence tracking is still pending.)
 
 ### 4) Safety Controls
 
-- [ ] Add health/readiness checks to all containers/services.
-- [ ] Add per-service CPU/memory limits and restart policies.
-- [ ] Confirm strict HTTP/database timeouts and bounded retries in each language runtime.
+- [ ] Add health/readiness checks to all containers/services. (partial: health endpoints/probes exist for query-engine and core k8s components; full service coverage is incomplete.)
+- [ ] Add per-service CPU/memory limits and restart policies. (partial: restart policies are set in compose and query-engine has k8s limits; not all services have explicit limits.)
+- [ ] Confirm strict HTTP/database timeouts and bounded retries in each language runtime. (partial: spider HTTP timeout controls exist; cross-service retry/backoff standards are not fully implemented.)
 
 ### 5) Data Protection
 
@@ -62,16 +65,16 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 
 ### 1) CI/CD Quality Gates (Required on Every PR)
 
-- [ ] Go: `go test ./...`
-- [ ] Python: `pytest` (or service test command)
-- [ ] Laravel: `php artisan test`
-- [ ] Client: `npm run build`
-- [ ] Rust: `cargo test`
-- [ ] Image vulnerability scan (fail build for critical vulnerabilities).
+- [x] Go: `go test ./...`
+- [x] Python: `pytest` (or service test command)
+- [x] Laravel: `php artisan test`
+- [x] Client: `npm run build`
+- [x] Rust: `cargo test`
+- [ ] Image vulnerability scan (fail build for critical vulnerabilities). (partial: required workflow enforces Trivy CRITICAL scanning on repository filesystem; image-level scanning is still pending.)
 
 ### 2) Queue Integrity and Replayability
 
-- [ ] Add idempotency strategy for Redis->Mongo writes (upserts + deterministic keys/content hash).
+- [x] Add idempotency strategy for Redis->Mongo writes (upserts + deterministic keys/content hash).
 - [ ] Add retry policy with backoff and max attempts.
 - [ ] Add DLQ/quarantine path for poison messages.
 - [ ] Store checkpoints/watermarks for replay and recovery.
@@ -79,8 +82,8 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 ### 3) Observability Baseline
 
 - [ ] Centralize logs (JSON format with `service`, `trace_id`, `error`, `duration_ms`).
-- [ ] Add metrics for queue depth, oldest message age, worker throughput, API latency, error rate.
-- [ ] Create first alert set:
+- [ ] Add metrics for queue depth, oldest message age, worker throughput, API latency, error rate. (partial: alert rules are defined; exporter/instrumentation wiring is still needed.)
+- [ ] Create first alert set: (partial: API 5xx/latency, queue backlog/message-age, Redis memory, and backup freshness alerts exist; restart-spike and eviction-specific alerts are still pending.)
   - queue depth rising continuously for 15m
   - API p95 latency above threshold
   - service crash loops/restart spikes
@@ -93,7 +96,7 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 ### 1) Availability and Scaling
 
 - [ ] Introduce autoscaling signals by queue lag and message age.
-- [ ] Isolate read path from write path contention (query-engine should remain responsive during indexing spikes).
+- [ ] Isolate read path from write path contention (query-engine should remain responsive during indexing spikes). (partial: query and pipeline Redis roles are isolated; broader contention protections still need validation.)
 - [ ] Add periodic consistency verification jobs across Mongo collections.
 
 ### 2) Supply Chain Security
@@ -114,30 +117,30 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 
 ### Compose and Deployment Structure
 
-- [ ] Create environment-specific compose files:
+- [ ] Create environment-specific compose files: (partial: `docker-compose.prod.yml` exists; `docker-compose.dev.yml` is still missing.)
   - `docker-compose.dev.yml`
   - `docker-compose.prod.yml`
-- [ ] In prod compose:
+- [ ] In prod compose: (partial: bind mounts/dev commands are addressed; healthchecks and resource constraints are still incomplete.)
   - remove bind mounts for application code
   - disable dev server commands
   - attach healthchecks and resource constraints
 
 ### Environment Variable Clarity
 
-- [ ] Replace ambiguous Redis vars with explicit names:
+- [ ] Replace ambiguous Redis vars with explicit names: (partial: explicit vars are adopted in production compose/runtime wrappers and core services; legacy fallback vars remain in several services.)
   - `PIPELINE_REDIS_URL` (required)
   - `QUERY_REDIS_URL` (optional/isolated for query cache-session workloads)
-- [ ] Add startup validation that fails fast if required vars are missing.
+- [ ] Add startup validation that fails fast if required vars are missing. (partial: required-env validation now exists for spider/indexer/image-indexer/backlinks and production compose contract; full cross-service enforcement is not yet universal.)
 
 ### Query-Engine Asset Reliability
 
-- [ ] Keep Vite build in Docker image build pipeline.
-- [ ] Add pre-start check to fail fast when `public/build/manifest.json` is missing.
+- [x] Keep Vite build in Docker image build pipeline.
+- [x] Add pre-start check to fail fast when `public/build/manifest.json` is missing.
 
 ### Client Stability
 
-- [ ] Keep `VITE_BACKEND_URL` environment-driven for prod/staging/dev.
-- [ ] Ensure production client points to stable API ingress URL, not localhost.
+- [x] Keep `VITE_BACKEND_URL` environment-driven for prod/staging/dev.
+- [ ] Ensure production client points to stable API ingress URL, not localhost. (partial: client supports `VITE_BACKEND_URL`; production deployment wiring still needs explicit enforcement.)
 
 ---
 
@@ -146,12 +149,12 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 ### Spider (Go)
 
 - [ ] Enforce crawl budgets and domain rate limits.
-- [ ] Set bounded queue insertion to prevent broker overload.
+- [x] Set bounded queue insertion to prevent broker overload.
 - [ ] Add metrics for fetched pages/sec, timeout rate, and enqueue failures.
 
 ### Indexer/Image Indexer/Backlinks/TF-IDF (Python)
 
-- [ ] Ensure all write paths are idempotent (upsert or unique constraints).
+- [x] Ensure all write paths are idempotent (upsert or unique constraints).
 - [ ] Apply backoff with jitter on transient Mongo/Redis errors.
 - [ ] Add dead-letter handling for unparseable payloads.
 
@@ -162,14 +165,14 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 
 ### Query-Engine (Laravel)
 
-- [ ] Add `healthz` and dependency-aware `readyz` endpoints.
+- [x] Add `healthz` and dependency-aware `readyz` endpoints (implemented as `/api/health/live` and `/api/health/ready`).
 - [ ] Add request rate limiting at edge/API gateway.
 - [ ] Use cache key versioning for rank/index updates.
 
 ### Client (Vite)
 
 - [ ] Use production build artifacts for deployment.
-- [ ] Do not rely on dev server in production.
+- [x] Do not rely on dev server in production.
 
 ---
 
@@ -180,7 +183,7 @@ This checklist converts the Senior Developer + Backend Architect hardening guida
 - [ ] Performance gate: query API p95 latency within agreed SLO at expected load.
 - [ ] Data gate: backup + restore drill completed within RPO/RTO targets.
 - [ ] Operations gate: on-call runbook validated by engineer not authoring the change.
-- [ ] Governance gate: release checklist, rollback runbook, and incident comms template are present and reviewed.
+- [ ] Governance gate: release checklist, rollback runbook, and incident comms template are present and reviewed. (partial: all three docs are present in `docs/`; formal review/sign-off evidence is pending.)
 
 ---
 
@@ -205,10 +208,10 @@ Use this every week for staging and production.
 
 ## Starter Alert Thresholds
 
-- [ ] API 5xx warning >1%/5m, critical >3%/5m.
-- [ ] API latency warning p95 >400ms/10m, critical p95 >800ms/5m.
-- [ ] Queue depth warning >10k + rising/15m, critical >50k + rising/15m.
-- [ ] Oldest queue message warning >5m, critical >15m.
+- [ ] API 5xx warning >1%/5m, critical >3%/5m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
+- [ ] API latency warning p95 >400ms/10m, critical p95 >800ms/5m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
+- [ ] Queue depth warning >10k + rising/15m, critical >50k + rising/15m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
+- [ ] Oldest queue message warning >5m, critical >15m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
 - [ ] Worker restarts warning >=3/10m, critical >=6/10m.
-- [ ] Redis memory warning >75%, critical >90%; pipeline Redis evictions critical if >0 for 5m.
-- [ ] Backup freshness critical if no successful backup in 26h.
+- [ ] Redis memory warning >75%, critical >90%; pipeline Redis evictions critical if >0 for 5m. (partial: high-memory critical rule exists; warning and eviction-specific rules are pending.)
+- [ ] Backup freshness critical if no successful backup in 26h. (partial: alert rule exists; backup job/exporter signal still needs full runtime integration.)

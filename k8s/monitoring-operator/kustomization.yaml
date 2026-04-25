@@ -3,5 +3,9 @@ kind: Kustomization
 namespace: moogle
 
 resources:
+  - serviceaccount-prometheus-local.yaml
+  - role-prometheus-local.yaml
+  - rolebinding-prometheus-local.yaml
+  - prometheus-local.yaml
   - servicemonitor-query-engine-metrics.yaml
   - servicemonitor-runtime-metrics.yaml

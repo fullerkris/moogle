@@ -7,13 +7,20 @@ This document introduces the first deployable runtime baseline for both target p
 - Compose profile: `deploy/compose/docker-compose.prod.yml`
 - Ingress: Caddy with a hardened baseline in `deploy/compose/Caddyfile`
 - Public exposure: Caddy only (`:80`)
-- Internal services: query-engine app runtime, isolated query Redis, isolated pipeline Redis, MongoDB
+- Internal services: query-engine app runtime, spider/indexer/image-indexer/backlinks/tfidf/page-rank workers, isolated query Redis, isolated pipeline Redis, MongoDB
 
 Run locally:
 
 ```bash
-docker compose -f deploy/compose/docker-compose.prod.yml up -d
+VAULT_ADDR=http://127.0.0.1:8200 \
+VAULT_TOKEN=<vault-token> \
+./scripts/vault/run-prod-compose.sh staging up -d
 ```
+
+Notes:
+
+- `run-prod-compose.sh` exports shared + `query-engine` secrets from Vault and enforces required env contracts.
+- Compose services expose `*.internal` aliases (`pipeline-redis.internal`, `query-redis.internal`, `mongo.internal`) to match the shared Vault URL contract.
 
 ## Kubernetes Baseline (Kustomize)
 
@@ -59,4 +66,24 @@ kustomize build k8s/overlays/dev | kubectl apply -f -
 
 - `runtime-metrics-exporter` image is published to GHCR as `ghcr.io/ionelpopjara/moogle/runtime-metrics-exporter`.
 - Kubernetes overlays pin the runtime exporter image reference via each overlay `kustomization.yaml`.
-- For Prometheus Operator deployments, apply `k8s/monitoring-operator` to register ServiceMonitor resources.
+- For Prometheus Operator deployments, apply `k8s/monitoring-operator` to register ServiceMonitor resources and a minimal local `Prometheus` custom resource.
+- Follow-up: tune Prometheus retention/storage and resource limits for non-local clusters.
+
+## Project Kubeconfig Template
+
+- Start from `k8s/kubeconfig.template.yaml` and save a local copy as `k8s/kubeconfig.local.yaml`.
+- Fill in your cluster API endpoint, CA bundle, and bearer token values.
+- Or generate it in one command with:
+
+```bash
+scripts/create-kubeconfig-local.sh \
+  --server https://YOUR_K8S_API_SERVER:6443 \
+  --token "YOUR_BEARER_TOKEN" \
+  --ca-file /absolute/path/to/cluster-ca.crt
+```
+
+- Run kubectl commands with the project helper script:
+
+```bash
+scripts/kubectl-with-config.sh k8s/kubeconfig.local.yaml apply -k k8s/monitoring-operator
+```

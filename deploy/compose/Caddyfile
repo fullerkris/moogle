@@ -9,19 +9,29 @@
     }
 
     @api path /api/*
-    reverse_proxy @api laravel:9000 {
-        transport fastcgi {
-            split .php
-            read_timeout 30s
-            write_timeout 30s
+    handle @api {
+        rewrite * /index.php
+        reverse_proxy laravel:9000 {
+            transport fastcgi {
+                split .php
+                env SCRIPT_FILENAME /var/www/public/index.php
+                env DOCUMENT_ROOT /var/www/public
+                read_timeout 30s
+                write_timeout 30s
+            }
         }
     }
 
-    reverse_proxy laravel:9000 {
-        transport fastcgi {
-            split .php
-            read_timeout 30s
-            write_timeout 30s
+    handle {
+        rewrite * /index.php
+        reverse_proxy laravel:9000 {
+            transport fastcgi {
+                split .php
+                env SCRIPT_FILENAME /var/www/public/index.php
+                env DOCUMENT_ROOT /var/www/public
+                read_timeout 30s
+                write_timeout 30s
+            }
         }
     }
 }
