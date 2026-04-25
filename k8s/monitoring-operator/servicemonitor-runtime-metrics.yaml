@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: runtime-metrics
+  labels:
+    app.kubernetes.io/name: runtime-metrics
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: runtime-metrics
+  namespaceSelector:
+    matchNames:
+      - moogle
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -6,6 +6,11 @@ resources:
 
 nameSuffix: -staging
 
+images:
+  - name: runtime-metrics-exporter:latest
+    newName: ghcr.io/ionelpopjara/moogle/runtime-metrics-exporter
+    newTag: latest
+
 patches:
   - target:
       kind: Ingress

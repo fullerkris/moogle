@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtime-metrics
+  labels:
+    app.kubernetes.io/name: runtime-metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: "9108"
+spec:
+  selector:
+    app: runtime-metrics-exporter
+  ports:
+    - name: metrics
+      port: 9108
+      targetPort: 9108

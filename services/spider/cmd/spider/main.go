@@ -47,6 +47,24 @@ func getEnvInt(key string, fallback int) int {
 	return parsed
 }
 
+func getEnvBool(key string, fallback bool) bool {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return fallback
+	}
+
+	normalized := strings.TrimSpace(strings.ToLower(value))
+	switch normalized {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		log.Printf("Invalid %s value %q. Falling back to %t", key, value, fallback)
+		return fallback
+	}
+}
+
 func main() {
 	// Parse flags
 	maxConcurrency := flag.Int("max-concurrency", 10, "Maximum number of concurrent workers")
@@ -59,6 +77,7 @@ func main() {
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
 	redisDB := getEnv("REDIS_DB", "0")
+	allowRedisFallback := getEnvBool("ALLOW_REDIS_HOST_FALLBACK", false)
 	startingURL := getEnv("STARTING_URL", "https://en.wikipedia.org/wiki/Kamen_Rider")
 	httpTimeoutSeconds := getEnvInt("SPIDER_HTTP_TIMEOUT_SECONDS", utils.DefaultHTTPTimeoutSeconds)
 	httpMaxBodyBytes := getEnvInt("SPIDER_HTTP_MAX_BODY_BYTES", utils.DefaultHTTPMaxBodyBytes)
@@ -86,6 +105,10 @@ func main() {
 	if pipelineRedisURL != "" {
 		err = db.ConnectToRedisURL(pipelineRedisURL)
 	} else {
+		if !allowRedisFallback {
+			log.Println("PIPELINE_REDIS_URL is required. Set ALLOW_REDIS_HOST_FALLBACK=true to use REDIS_HOST/REDIS_PORT fallback")
+			return
+		}
 		log.Println("PIPELINE_REDIS_URL not set, falling back to REDIS_HOST/REDIS_PORT")
 		err = db.ConnectToRedis(redisHost, redisPort, redisPassword, redisDB)
 	}

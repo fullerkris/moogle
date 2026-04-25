@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"log"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -76,6 +77,7 @@ func (pgc *PageController) SavePages(crawcfg *crawler.CrawlerConfig) {
 		normalizedURL string
 		hSetCmd       *redis.IntCmd
 		lPushCmd      *redis.IntCmd
+		zAddCmd       *redis.IntCmd
 	}
 
 	writeCmds := make([]pageWriteCmd, 0, len(data))
@@ -88,10 +90,15 @@ func (pgc *PageController) SavePages(crawcfg *crawler.CrawlerConfig) {
 		}
 
 		pageKey := utils.PagePrefix + ":" + page.NormalizedURL
+		enqueuedAt := float64(time.Now().Unix())
 		writeCmds = append(writeCmds, pageWriteCmd{
 			normalizedURL: page.NormalizedURL,
 			hSetCmd:       pipeline.HSet(pgc.db.Context, pageKey, pageHash),
 			lPushCmd:      pipeline.LPush(pgc.db.Context, utils.IndexerQueueKey, pageKey),
+			zAddCmd: pipeline.ZAdd(pgc.db.Context, utils.IndexerQueueAgeKey, redis.Z{
+				Member: pageKey,
+				Score:  enqueuedAt,
+			}),
 		})
 	}
 
@@ -113,6 +120,10 @@ func (pgc *PageController) SavePages(crawcfg *crawler.CrawlerConfig) {
 
 		if err := cmd.lPushCmd.Err(); err != nil {
 			log.Printf("LPUSH failed for %s: %v", cmd.normalizedURL, err)
+		}
+
+		if err := cmd.zAddCmd.Err(); err != nil {
+			log.Printf("ZADD failed for %s queue age tracking: %v", cmd.normalizedURL, err)
 		}
 	}
 

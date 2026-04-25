@@ -56,6 +56,14 @@ Pipe to shell if needed:
 eval "$(./scripts/vault/export-service-env.sh staging query-engine)"
 ```
 
+Run production compose using Vault-injected secrets:
+
+```bash
+./scripts/vault/run-prod-compose.sh staging up -d
+```
+
+This wrapper loads shared + service secrets and runs `deploy/compose/docker-compose.prod.yml` without relying on checked-in `.env` files.
+
 ## Kubernetes Migration Path
 
 - Keep app env names unchanged (`PIPELINE_REDIS_URL`, `MONGODB_URI`, etc.).
@@ -66,3 +74,8 @@ eval "$(./scripts/vault/export-service-env.sh staging query-engine)"
 
 - Local config disables TLS (`tls_disable = 1`) for developer bootstrap only.
 - Production Vault must run with TLS, KMS auto-unseal, audit logging, and policy least privilege.
+- Required secret contract for production compose includes:
+  - `APP_KEY`, `APP_URL`
+  - `QUERY_REDIS_URL`, `CACHE_REDIS_URL`
+  - `MONGODB_URI`, `MONGODB_DATABASE`
+  - `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`

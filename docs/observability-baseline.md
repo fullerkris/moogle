@@ -7,6 +7,9 @@ This baseline adds first-pass observability assets for production migration.
 - `observability/docker-compose.yml`: local Prometheus + Grafana stack
 - `observability/prometheus/prometheus.yml`: scrape config baseline
 - `observability/prometheus/alerts.yml`: initial warning/critical alert rules
+- `observability/exporters/runtime-metrics/*`: runtime exporter for queue + Redis health metrics
+- `observability/grafana/provisioning/*`: Grafana datasource/dashboard provisioning
+- `observability/grafana/dashboards/moogle-runtime-overview.json`: starter runtime dashboard
 - `docs/weekly-readiness-scorecard-template.md`: weekly RAG review template
 - `scripts/ops/generate-weekly-scorecard.sh`: helper to create weekly scorecard files
 
@@ -15,6 +18,16 @@ This baseline adds first-pass observability assets for production migration.
 ```bash
 docker compose -f observability/docker-compose.yml up -d
 ```
+
+## Kubernetes (Prometheus Operator)
+
+If your cluster uses Prometheus Operator, apply ServiceMonitor resources:
+
+```bash
+kubectl apply -k k8s/monitoring-operator
+```
+
+This switches scrape discovery from annotation-only to explicit ServiceMonitor resources.
 
 ## Alert Baseline Targets
 
@@ -27,5 +40,8 @@ docker compose -f observability/docker-compose.yml up -d
 
 ## Notes
 
-- Some targets require exporters/instrumentation to expose metrics with the referenced names.
-- This PR provides the baseline contract and rule set; follow-up PRs should wire concrete exporters and dashboards.
+- Query-engine now exposes `/metrics` from Laravel for request count + latency histogram metrics.
+- Spider/indexer now track queue enqueue timestamps under `pages_queue_enqueued_at` so oldest message age can be exported.
+- Runtime exporter emits queue depth, oldest message age, Redis memory usage/capacity, and optional backup freshness.
+- Grafana now auto-loads the starter runtime dashboard from provisioning at container startup.
+- Runtime exporter image publish flow is automated in `.github/workflows/build-docker-images.yml` (`build-runtime-metrics-exporter`).

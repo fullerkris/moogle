@@ -36,7 +36,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate Python modules
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/indexer/requirements.txt
+          pip install -r services/image-indexer/requirements.txt
+          pip install -r services/backlinks-processor/requirements.txt
+          pip install -r services/tfidf/requirements.txt
+
+      - name: Run Python unit tests
+        run: |
+          PYTHONPATH=services/indexer python -m unittest discover -s services/indexer/tests -p "test_*.py"
+          PYTHONPATH=services/image-indexer python -m unittest discover -s services/image-indexer/tests -p "test_*.py"
+          PYTHONPATH=services/backlinks-processor python -m unittest discover -s services/backlinks-processor/tests -p "test_*.py"
+
+      - name: Validate Python modules compile
         run: |
           python -m py_compile services/indexer/main.py services/indexer/data/redis_client.py
           python -m py_compile services/image-indexer/main.py services/image-indexer/data/redis_client.py
@@ -55,6 +69,21 @@ jobs:
         with:
           php-version: "8.3"
           tools: composer
+          extensions: mongodb
+
+      - name: Install query-engine PHP dependencies
+        working-directory: ./services/query-engine
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare query-engine test environment
+        working-directory: ./services/query-engine
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Run query-engine tests
+        working-directory: ./services/query-engine
+        run: php artisan test --no-interaction
 
       - name: Lint query-engine PHP entrypoints
         run: |

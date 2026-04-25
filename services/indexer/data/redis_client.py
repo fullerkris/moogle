@@ -56,6 +56,7 @@ class RedisClient:
                 return None
 
             _, page_id = popped
+            self.client.zrem(INDEXER_QUEUE_AGE_KEY, page_id)
             return page_id
         except Exception as e:
             logger.error(f"Could not fetch from message queue: {e}")

@@ -10,8 +10,11 @@ resources:
   - service-query-engine.yaml
   - deployment-caddy.yaml
   - service-caddy.yaml
+  - service-query-engine-metrics.yaml
   - deployment-query-redis.yaml
   - service-query-redis.yaml
   - deployment-pipeline-redis.yaml
   - service-pipeline-redis.yaml
+  - deployment-runtime-metrics.yaml
+  - service-runtime-metrics.yaml
   - ingress.yaml

@@ -28,13 +28,8 @@ scrape_configs:
           - tfidf-service:8080
           - page-rank-service:8080
 
-  - job_name: redis
+  - job_name: runtime-metrics
+    metrics_path: /metrics
     static_configs:
       - targets:
-          - query-redis:6379
-          - pipeline-redis:6379
-
-  - job_name: mongo
-    static_configs:
-      - targets:
-          - mongo:27017
+          - runtime-metrics-exporter:9108

@@ -29,12 +29,25 @@ class ConfigParsingTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
+                "ALLOW_REDIS_HOST_FALLBACK": "true",
                 "REDIS_HOST": "redis",
                 "REDIS_PORT": "not-a-number",
             },
             clear=True,
         ):
             with self.assertRaisesRegex(ValueError, "REDIS_PORT"):
+                backlinks_config.get_redis_config(LoggerStub())
+
+    def test_redis_requires_pipeline_url_when_fallback_disabled(self):
+        with patch.dict(
+            os.environ,
+            {
+                "REDIS_HOST": "redis",
+                "REDIS_PORT": "6379",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "PIPELINE_REDIS_URL"):
                 backlinks_config.get_redis_config(LoggerStub())
 
     def test_mongo_invalid_port_raises_value_error(self):

@@ -14,8 +14,25 @@ services:
     image: grafana/grafana:11.2.2
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  runtime-metrics-exporter:
+    build:
+      context: ./exporters/runtime-metrics
+    ports:
+      - "9108:9108"
+    environment:
+      PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:-redis://pipeline-redis:6379/0}
+      QUERY_REDIS_URL: ${QUERY_REDIS_URL:-redis://query-redis:6379/0}
+      EXPORTER_PORT: "9108"
+      SCRAPE_INTERVAL_SECONDS: "10"
     restart: unless-stopped

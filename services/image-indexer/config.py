@@ -8,11 +8,24 @@ def _parse_int_env(name, value):
         raise ValueError(f"{name} must be an integer, got {value!r}")
 
 
+def _env_flag(name, default=False):
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def get_redis_config(logger):
     pipeline_redis_url = os.getenv("PIPELINE_REDIS_URL", "").strip()
     if pipeline_redis_url:
         logger.info("Using PIPELINE_REDIS_URL for Redis connection")
         return {"redis_url": pipeline_redis_url}
+
+    if not _env_flag("ALLOW_REDIS_HOST_FALLBACK", default=False):
+        raise ValueError(
+            "PIPELINE_REDIS_URL is required; set ALLOW_REDIS_HOST_FALLBACK=true to use REDIS_HOST/REDIS_PORT fallback"
+        )
 
     redis_host = os.getenv("REDIS_HOST", "localhost")
     redis_port_raw = os.getenv("REDIS_PORT", "6379")

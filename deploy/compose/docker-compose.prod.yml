@@ -14,15 +14,15 @@ services:
 
   laravel:
     image: query-engine-image:latest
-    env_file:
-      - ../../services/query-engine/.env
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
-      QUERY_REDIS_URL: redis://query-redis:6379/0
-      CACHE_REDIS_URL: redis://query-redis:6379/1
-      MONGODB_URI: mongodb://moogle:change-me@mongo:27017/moogle?authSource=admin
-      MONGODB_DATABASE: moogle
+      APP_KEY: ${APP_KEY:?set APP_KEY}
+      APP_URL: ${APP_URL:?set APP_URL}
+      QUERY_REDIS_URL: ${QUERY_REDIS_URL:?set QUERY_REDIS_URL}
+      CACHE_REDIS_URL: ${CACHE_REDIS_URL:?set CACHE_REDIS_URL}
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:?set MONGODB_DATABASE}
     depends_on:
       - query-redis
       - mongo
@@ -51,8 +51,8 @@ services:
   mongo:
     image: mongo:7
     environment:
-      MONGO_INITDB_ROOT_USERNAME: moogle
-      MONGO_INITDB_ROOT_PASSWORD: change-me
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?set MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD}
     restart: unless-stopped
     volumes:
       - mongo_data:/data/db

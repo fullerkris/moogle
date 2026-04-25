@@ -26,6 +26,7 @@ const (
 	// Message Queues
 	SpiderQueueKey      = "spider_queue"
 	IndexerQueueKey     = "pages_queue"
+	IndexerQueueAgeKey  = "pages_queue_enqueued_at"
 	SignalQueueKey      = "signal_queue"
 	SeenURLsKey         = "spider_seen_urls"
 	VisitedURLsKey      = "spider_visited_urls"

@@ -33,8 +33,10 @@ kustomize build k8s/overlays/dev | kubectl apply -f -
 
 - `query-engine` deployment (Laravel/PHP-FPM)
 - `query-engine-caddy` deployment (HTTP ingress inside cluster)
+- `query-engine-metrics` service (internal metrics scrape target for `/metrics`)
 - `query-redis` deployment/service
 - `pipeline-redis` deployment/service
+- `runtime-metrics-exporter` deployment/service (queue and Redis telemetry)
 - `Ingress` with default timeout/body-size controls
 
 ## Platform Parity Contract
@@ -45,9 +47,16 @@ kustomize build k8s/overlays/dev | kubectl apply -f -
   - `CACHE_REDIS_URL`
 - Ingress remains the only public entrypoint.
 - Query and pipeline Redis roles stay isolated across both platforms.
+- Kubernetes metrics scrape hints are attached via `prometheus.io/*` annotations on `query-engine-metrics` and `runtime-metrics` services.
 
 ## Follow-up Items
 
 - Integrate Vault secret references into Kubernetes overlays.
 - Add MongoDB operator/managed database strategy for HA.
 - Wire TLS cert management (cert-manager) for production ingress.
+
+## Runtime Metrics Image and Scrape Notes
+
+- `runtime-metrics-exporter` image is published to GHCR as `ghcr.io/ionelpopjara/moogle/runtime-metrics-exporter`.
+- Kubernetes overlays pin the runtime exporter image reference via each overlay `kustomization.yaml`.
+- For Prometheus Operator deployments, apply `k8s/monitoring-operator` to register ServiceMonitor resources.

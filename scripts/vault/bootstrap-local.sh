@@ -7,6 +7,11 @@ if ! command -v vault >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jq is required" >&2
+  exit 1
+fi
+
 if [[ -z "${VAULT_ADDR:-}" ]]; then
   export VAULT_ADDR="http://127.0.0.1:8200"
 fi
@@ -29,11 +34,16 @@ for env in dev staging prod; do
     QUERY_REDIS_URL="redis://query-redis.internal:6379/0" \
     CACHE_REDIS_URL="redis://query-redis.internal:6379/1" \
     MONGODB_URI="mongodb://moogle:change-me@mongo.internal:27017/moogle?authSource=admin" \
+    MONGODB_DATABASE="moogle" \
+    MONGO_INITDB_ROOT_USERNAME="moogle" \
+    MONGO_INITDB_ROOT_PASSWORD="change-me" \
     SECRET_ROTATION_DAYS="180"
 
   vault kv put "secret/moogle/${env}/query-engine" \
     APP_ENV="${env}" \
-    APP_DEBUG="false"
+    APP_DEBUG="false" \
+    APP_KEY="base64:replace-me" \
+    APP_URL="https://moogle.example.com"
 done
 
 echo "Writing read-only policy"

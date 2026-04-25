@@ -56,4 +56,18 @@ func TestSavePagesWritesPageDataAndIndexerQueue(t *testing.T) {
 	if queueItems[0] != pageKey {
 		t.Fatalf("expected queue item %q, got %q", pageKey, queueItems[0])
 	}
+
+	queueAges, err := redisServer.SortedSet(utils.IndexerQueueAgeKey)
+	if err != nil {
+		t.Fatalf("expected queue age sorted set to exist: %v", err)
+	}
+
+	queueAgeScore, queueAgeExists := queueAges[pageKey]
+	if !queueAgeExists {
+		t.Fatalf("expected queue age key entry for %q", pageKey)
+	}
+
+	if queueAgeScore <= 0 {
+		t.Fatalf("expected positive queue age score for %q, got %f", pageKey, queueAgeScore)
+	}
 }

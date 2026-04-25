@@ -7,6 +7,11 @@ if ! command -v vault >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jq is required" >&2
+  exit 1
+fi
+
 if [[ -z "${VAULT_ADDR:-}" ]]; then
   export VAULT_ADDR="http://127.0.0.1:8200"
 fi

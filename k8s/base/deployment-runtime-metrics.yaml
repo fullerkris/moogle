@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime-metrics-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: runtime-metrics-exporter
+  template:
+    metadata:
+      labels:
+        app: runtime-metrics-exporter
+    spec:
+      containers:
+        - name: runtime-metrics-exporter
+          image: runtime-metrics-exporter:latest
+          ports:
+            - containerPort: 9108
+          envFrom:
+            - configMapRef:
+                name: moogle-runtime
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9108
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9108
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi

@@ -2,6 +2,7 @@
 
 # Message Queues
 INDEXER_QUEUE_KEY = "pages_queue"
+INDEXER_QUEUE_AGE_KEY = "pages_queue_enqueued_at"
 SIGNAL_QUEUE_KEY = "signal_queue"
 RESUME_CRAWL = "RESUME_CRAWL"
 IMAGE_INDEXER_QUEUE_KEY = "image_indexer_queue"

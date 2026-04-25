@@ -1,6 +1,7 @@
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -96,3 +97,38 @@ jobs:
           source: "./docker-compose-artifacts/docker-compose.yml"
           target: "~/SearchEngine/${{ matrix.service }}/"
           strip_components: 1
+
+  build-runtime-metrics-exporter:
+    name: Build Runtime Metrics Exporter Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log into registry ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build runtime metrics exporter image
+        run: |
+          IMAGE_BASE="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          RELEASE_TAG="${{ github.ref_name }}"
+
+          docker build \
+            -t "${IMAGE_BASE}/runtime-metrics-exporter:latest" \
+            -t "${IMAGE_BASE}/runtime-metrics-exporter:${RELEASE_TAG}" \
+            observability/exporters/runtime-metrics
+
+      - name: Push runtime metrics exporter image
+        run: |
+          IMAGE_BASE="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          RELEASE_TAG="${{ github.ref_name }}"
+
+          docker push "${IMAGE_BASE}/runtime-metrics-exporter:latest"
+          docker push "${IMAGE_BASE}/runtime-metrics-exporter:${RELEASE_TAG}"
