@@ -102,5 +102,20 @@ Requirements:
 - Create `variables.env` for each service under `services/*/` (spider/indexer/image-indexer/backlinks-processor/page-rank/tfidf).
 - Shared infra is started by script (`redis`, `mongo`). For container-to-container access, service env should point to these hosts (for example `REDIS_HOST=redis`, and equivalent Mongo host/URI using `mongo`).
 
+### One-command local project spin-up
+
+Use the single helper script to start local Vault, the full backend stack, and the client dev server:
+
+```bash
+scripts/spin-up-local.sh
+```
+
+Useful commands:
+
+```bash
+scripts/spin-up-local.sh status
+scripts/spin-up-local.sh down
+```
+
 ## Notes
 The documentation is a work in progress. I'll update it once I finish writing my thesis. For now, please refer to the code and comments in each service for more information on how to use them.
