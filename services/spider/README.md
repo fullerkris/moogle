@@ -26,6 +26,35 @@ STARTING_URL=<your_starting_url>            # default: https://en.wikipedia.org/
 SPIDER_HTTP_TIMEOUT_SECONDS=<seconds>       # default: 10
 SPIDER_HTTP_MAX_BODY_BYTES=<max_bytes>      # default: 2097152 (2 MiB)
 SPIDER_HTTP_USER_AGENT=<crawler_user_agent> # default: MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)
+
+# Spider policy layer (domain policy + robots + politeness)
+SPIDER_CRAWL_MODE=<open|allowlist>          # default: open
+SPIDER_ALLOWLIST_DOMAINS=<csv_domains>      # used when CRAWL_MODE=allowlist
+SPIDER_BLOCKLIST_DOMAINS=<csv_domains>      # always denied; takes priority over allowlist
+SPIDER_DOMAIN_MATCH_SUBDOMAINS=<true|false> # default: true
+
+SPIDER_ROBOTS_ENABLED=<true|false>              # default: true
+SPIDER_ROBOTS_CACHE_TTL_SECONDS=<seconds>       # default: 3600
+SPIDER_ROBOTS_ALLOW_ON_FETCH_FAILURE=<true|false> # default: true
+
+SPIDER_DEFAULT_CRAWL_DELAY_MS=<milliseconds>    # default: 1000
+SPIDER_MAX_CONCURRENT_PER_DOMAIN=<count>        # default: 1
+
+SPIDER_ROBOTS_BYPASS_DOMAINS=<csv_domains>      # explicit robots bypass list
+SPIDER_ROBOTS_BYPASS_SUBDOMAINS=<true|false>    # default: true
+SPIDER_ROBOTS_BYPASS_DELAY_MS=<milliseconds>    # default: SPIDER_DEFAULT_CRAWL_DELAY_MS
+
+# Spider metrics (prometheus)
+SPIDER_METRICS_ENABLED=<true|false>             # default: true
+SPIDER_METRICS_ADDR=<host:port>                 # default: :2113
+
+# Crawl budgets (starter tuned defaults)
+SPIDER_BUDGET_ENABLED=<true|false>              # default: true
+SPIDER_BUDGET_RUN_MAX_ATTEMPTS=<count>          # default: 50000
+SPIDER_BUDGET_RUN_MAX_SUCCESSES=<count>         # default: 30000
+SPIDER_BUDGET_DOMAIN_MAX_ATTEMPTS=<count>       # default: 2000
+SPIDER_BUDGET_BYPASS_MAX_RUN=<count>            # default: 200
+SPIDER_BUDGET_BYPASS_MAX_DOMAIN=<count>         # default: 50
 ```
 
 ### Using Docker
@@ -141,6 +170,44 @@ For each URL, the spider uses a configured HTTP client with protective limits:
 - Content-type gate for HTML responses only (`text/html`)
 - Max response body size from `SPIDER_HTTP_MAX_BODY_BYTES`
 - Non-2xx/3xx responses are treated as fetch errors and skipped
+
+## Domain policy, robots, and controlled bypass
+
+The spider now supports a policy layer before each fetch:
+
+- Domain policy
+  - `SPIDER_CRAWL_MODE=open`: crawl any domain unless blocklisted.
+  - `SPIDER_CRAWL_MODE=allowlist`: only crawl `SPIDER_ALLOWLIST_DOMAINS` (minus blocklist entries).
+  - `SPIDER_BLOCKLIST_DOMAINS` always wins over allowlist.
+- Robots policy (enabled by default)
+  - Fetches and caches `robots.txt` per host.
+  - Applies `Allow` / `Disallow` for the configured user-agent.
+  - Applies `Crawl-delay` if present, otherwise uses crawler delay fallback.
+  - On robots fetch failure, behavior follows `SPIDER_ROBOTS_ALLOW_ON_FETCH_FAILURE`.
+- Controlled bypass
+  - `SPIDER_ROBOTS_BYPASS_DOMAINS` skips robots allow/disallow and robots crawl-delay checks for explicit domains.
+  - Bypassed domains still respect crawler politeness and per-domain concurrency limits.
+  - Bypassed fetches emit audit logs (`event=robots_bypass_applied`) with host, matched bypass domain, match type, delay, and URL.
+
+## Metrics and budget defaults
+
+- Spider now exports Prometheus metrics on `/metrics` (default bind `:2113`).
+- Starter tuned budget defaults are enabled and meant to be tuned as telemetry matures:
+  - run attempts: `50000`
+  - run successes: `30000`
+  - domain attempts: `2000`
+  - bypass attempts (run): `200`
+  - bypass attempts (per domain): `50`
+
+Primary spider metrics:
+
+- `moogle_spider_fetch_total`
+- `moogle_spider_fetch_duration_seconds`
+- `moogle_spider_enqueue_total`
+- `moogle_spider_policy_decision_total`
+- `moogle_spider_bypass_total`
+- `moogle_spider_budget_denied_total`
+- `moogle_spider_budget_remaining`
 
 ## Testing
 

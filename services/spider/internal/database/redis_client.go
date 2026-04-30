@@ -46,6 +46,14 @@ type Database struct {
 	Context context.Context
 }
 
+type EnqueueResult string
+
+const (
+	EnqueueAccepted  EnqueueResult = "accepted"
+	EnqueueDuplicate EnqueueResult = "duplicate"
+	EnqueueQueueFull EnqueueResult = "queue_full"
+)
+
 func (db *Database) connectRedis(options *redis.Options) error {
 	db.Client = redis.NewClient(options)
 	db.Context = context.Background()
@@ -93,16 +101,21 @@ func lookupKey(normalizedURL string) string {
 }
 
 func (db *Database) PushURL(rawURL string, score float64) error {
+	_, err := db.PushURLWithResult(rawURL, score)
+	return err
+}
+
+func (db *Database) PushURLWithResult(rawURL string, score float64) (EnqueueResult, error) {
 	// Remove fragments and queries from rawURL
 	rawURL, err := utils.StripURL(rawURL)
 	if err != nil {
-		return fmt.Errorf("Could not strip URL: %w", err)
+		return EnqueueDuplicate, fmt.Errorf("Could not strip URL: %w", err)
 	}
 
 	// Normalize URL
 	normalizedURL, err := utils.NormalizeURL(rawURL)
 	if err != nil {
-		return fmt.Errorf("Could not normalize URL: %w", err)
+		return EnqueueDuplicate, fmt.Errorf("Could not normalize URL: %w", err)
 	}
 
 	res, err := enqueueIfUnseenScript.Run(
@@ -116,20 +129,20 @@ func (db *Database) PushURL(rawURL string, score float64) error {
 	).Int()
 
 	if err != nil {
-		return fmt.Errorf("Could not add URL to queue: %w", err)
+		return EnqueueDuplicate, fmt.Errorf("Could not add URL to queue: %w", err)
 	}
 
 	if res == -1 {
-		return nil
+		return EnqueueQueueFull, nil
 	}
 
 	if res == 0 {
-		return nil
+		return EnqueueDuplicate, nil
 	}
 
 	fmt.Printf("Pushed %v (%v) to queue\n", rawURL, normalizedURL)
 
-	return nil
+	return EnqueueAccepted, nil
 }
 
 func (db *Database) ExistsInQueue(rawURL string) (float64, bool) {

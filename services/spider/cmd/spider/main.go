@@ -16,6 +16,8 @@ import (
 	"github.com/IonelPopJara/search-engine/services/spider/internal/database"
 	"github.com/IonelPopJara/search-engine/services/spider/internal/pages"
 	"github.com/IonelPopJara/search-engine/services/spider/internal/utils"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // getEnv retrieves the value of an environment variable or returns a fallback value if not set.
@@ -65,6 +67,25 @@ func getEnvBool(key string, fallback bool) bool {
 	}
 }
 
+func getEnvStringList(key string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.ToLower(strings.TrimSpace(part))
+		if trimmed == "" {
+			continue
+		}
+		items = append(items, trimmed)
+	}
+
+	return items
+}
+
 func main() {
 	// Parse flags
 	maxConcurrency := flag.Int("max-concurrency", 10, "Maximum number of concurrent workers")
@@ -82,6 +103,26 @@ func main() {
 	httpTimeoutSeconds := getEnvInt("SPIDER_HTTP_TIMEOUT_SECONDS", utils.DefaultHTTPTimeoutSeconds)
 	httpMaxBodyBytes := getEnvInt("SPIDER_HTTP_MAX_BODY_BYTES", utils.DefaultHTTPMaxBodyBytes)
 	httpUserAgent := getEnv("SPIDER_HTTP_USER_AGENT", utils.DefaultHTTPUserAgent)
+	crawlMode := strings.ToLower(getEnv("SPIDER_CRAWL_MODE", string(crawler.CrawlModeOpen)))
+	allowlistDomains := getEnvStringList("SPIDER_ALLOWLIST_DOMAINS")
+	blocklistDomains := getEnvStringList("SPIDER_BLOCKLIST_DOMAINS")
+	domainMatchSubdomains := getEnvBool("SPIDER_DOMAIN_MATCH_SUBDOMAINS", true)
+	robotsEnabled := getEnvBool("SPIDER_ROBOTS_ENABLED", true)
+	robotsCacheTTLSeconds := getEnvInt("SPIDER_ROBOTS_CACHE_TTL_SECONDS", 3600)
+	defaultCrawlDelayMs := getEnvInt("SPIDER_DEFAULT_CRAWL_DELAY_MS", 1000)
+	maxConcurrentPerDomain := getEnvInt("SPIDER_MAX_CONCURRENT_PER_DOMAIN", 1)
+	robotsAllowOnFetchFailure := getEnvBool("SPIDER_ROBOTS_ALLOW_ON_FETCH_FAILURE", true)
+	robotsBypassDomains := getEnvStringList("SPIDER_ROBOTS_BYPASS_DOMAINS")
+	robotsBypassSubdomains := getEnvBool("SPIDER_ROBOTS_BYPASS_SUBDOMAINS", true)
+	robotsBypassDelayMs := getEnvInt("SPIDER_ROBOTS_BYPASS_DELAY_MS", defaultCrawlDelayMs)
+	metricsEnabled := getEnvBool("SPIDER_METRICS_ENABLED", true)
+	metricsAddr := getEnv("SPIDER_METRICS_ADDR", ":2113")
+	budgetEnabled := getEnvBool("SPIDER_BUDGET_ENABLED", true)
+	runMaxAttempts := getEnvInt("SPIDER_BUDGET_RUN_MAX_ATTEMPTS", 50000)
+	runMaxSuccesses := getEnvInt("SPIDER_BUDGET_RUN_MAX_SUCCESSES", 30000)
+	domainMaxAttempts := getEnvInt("SPIDER_BUDGET_DOMAIN_MAX_ATTEMPTS", 2000)
+	bypassMaxRun := getEnvInt("SPIDER_BUDGET_BYPASS_MAX_RUN", 200)
+	bypassMaxDomain := getEnvInt("SPIDER_BUDGET_BYPASS_MAX_DOMAIN", 50)
 
 	fetchClient := &http.Client{
 		Timeout: time.Duration(httpTimeoutSeconds) * time.Second,
@@ -98,6 +139,49 @@ func main() {
 		UserAgent:    httpUserAgent,
 		MaxBodyBytes: int64(httpMaxBodyBytes),
 	})
+
+	policyManager := crawler.NewFetchPolicyManager(crawler.FetchPolicyConfig{
+		Client:    fetchClient,
+		UserAgent: httpUserAgent,
+		Domain: crawler.DomainPolicyConfig{
+			Mode:            crawler.CrawlMode(crawlMode),
+			Allowlist:       allowlistDomains,
+			Blocklist:       blocklistDomains,
+			MatchSubdomains: domainMatchSubdomains,
+		},
+		Robots: crawler.RobotsConfig{
+			Enabled:                robotsEnabled,
+			CacheTTL:               time.Duration(robotsCacheTTLSeconds) * time.Second,
+			DefaultCrawlDelay:      time.Duration(defaultCrawlDelayMs) * time.Millisecond,
+			MaxConcurrentPerDomain: maxConcurrentPerDomain,
+			AllowOnFetchFailure:    robotsAllowOnFetchFailure,
+			BypassDomains:          robotsBypassDomains,
+			BypassSubdomains:       robotsBypassSubdomains,
+			BypassDelay:            time.Duration(robotsBypassDelayMs) * time.Millisecond,
+		},
+	})
+
+	budgetManager := crawler.NewCrawlBudgetManager(crawler.BudgetConfig{
+		Enabled:           budgetEnabled,
+		RunMaxAttempts:    runMaxAttempts,
+		RunMaxSuccesses:   runMaxSuccesses,
+		DomainMaxAttempts: domainMaxAttempts,
+		BypassMaxRun:      bypassMaxRun,
+		BypassMaxDomain:   bypassMaxDomain,
+	})
+
+	var spiderMetrics *crawler.SpiderMetrics
+	if metricsEnabled {
+		spiderMetrics = crawler.NewSpiderMetrics(prometheus.DefaultRegisterer)
+		go func() {
+			metricsMux := http.NewServeMux()
+			metricsMux.Handle("/metrics", promhttp.Handler())
+			log.Printf("Spider metrics endpoint listening on %s/metrics", metricsAddr)
+			if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
+				log.Printf("Spider metrics server stopped: %v", err)
+			}
+		}()
+	}
 
 	// Connect to Redis
 	db := &database.Database{}
@@ -136,6 +220,9 @@ func main() {
 		Images:         make(map[string][]*pages.Image),
 		MaxPages:       *maxPages,
 		MaxConcurrency: *maxConcurrency,
+		Policy:         policyManager,
+		Budget:         budgetManager,
+		Metrics:        spiderMetrics,
 	}
 
 	// Infinite loop to crawl the web in batches
