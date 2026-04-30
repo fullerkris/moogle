@@ -1,4 +1,122 @@
 groups:
+  - name: moogle-spider-recording
+    rules:
+      - record: moogle_spider:fetch_success_rps
+        expr: sum(rate(moogle_spider_fetch_total{result="success"}[5m]))
+
+      - record: moogle_spider:fetch_timeout_ratio
+        expr: sum(rate(moogle_spider_fetch_total{result="timeout"}[5m])) / clamp_min(sum(rate(moogle_spider_fetch_total[5m])), 1)
+
+      - record: moogle_spider:enqueue_reject_ratio
+        expr: sum(rate(moogle_spider_enqueue_total{result="rejected",reason!="duplicate"}[5m])) / clamp_min(sum(rate(moogle_spider_enqueue_total[5m])), 1)
+
+      - record: moogle_spider:policy_deny_rps
+        expr: sum(rate(moogle_spider_policy_decision_total{decision="deny"}[5m]))
+
+      - record: moogle_spider:bypass_share_ratio
+        expr: sum(rate(moogle_spider_bypass_total{result="granted"}[5m])) / clamp_min(sum(rate(moogle_spider_fetch_total[5m])), 1)
+
+      - record: moogle_spider:fetch_p95_seconds
+        expr: histogram_quantile(0.95, sum(rate(moogle_spider_fetch_duration_seconds_bucket[5m])) by (le))
+
+  - name: moogle-spider-alerts
+    rules:
+      - alert: SpiderMetricsEndpointDown
+        expr: up{job="spider"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider metrics endpoint is down"
+
+      - alert: SpiderTimeoutRateWarning
+        expr: moogle_spider:fetch_timeout_ratio > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spider timeout ratio above 10%"
+
+      - alert: SpiderTimeoutRateCritical
+        expr: moogle_spider:fetch_timeout_ratio > 0.15
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider timeout ratio above 15%"
+
+      - alert: SpiderEnqueueRejectWarning
+        expr: moogle_spider:enqueue_reject_ratio > 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spider enqueue reject ratio above 15%"
+
+      - alert: SpiderEnqueueRejectCritical
+        expr: moogle_spider:enqueue_reject_ratio > 0.25
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider enqueue reject ratio above 25%"
+
+      - alert: SpiderLowThroughputWithBacklog
+        expr: (moogle_spider:fetch_success_rps < 1) and (max(queue_depth{queue="pages_queue"}) > 100)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider throughput is low while queue backlog exists"
+
+      - alert: SpiderBypassUsageWarning
+        expr: moogle_spider:bypass_share_ratio > 0.03
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spider bypass usage above 3% of fetches"
+
+      - alert: SpiderBypassUsageCritical
+        expr: moogle_spider:bypass_share_ratio > 0.05
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider bypass usage above 5% of fetches"
+
+      - alert: SpiderBudgetAttemptsLowWarning
+        expr: moogle_spider_budget_remaining{scope="run_attempts"} < 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spider run attempt budget remaining below 10k"
+
+      - alert: SpiderBudgetAttemptsLowCritical
+        expr: moogle_spider_budget_remaining{scope="run_attempts"} < 5000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider run attempt budget remaining below 5k"
+
+      - alert: SpiderBudgetSuccessLowWarning
+        expr: moogle_spider_budget_remaining{scope="run_successes"} < 6000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spider run success budget remaining below 6k"
+
+      - alert: SpiderBudgetSuccessLowCritical
+        expr: moogle_spider_budget_remaining{scope="run_successes"} < 3000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spider run success budget remaining below 3k"
+
   - name: moogle-api-alerts
     rules:
       - alert: QueryEngineHigh5xxRate

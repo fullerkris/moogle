@@ -60,12 +60,16 @@ services:
 
   spider:
     image: ghcr.io/ionelpopjara/moogle/spider:latest
+    ports:
+      - "127.0.0.1:2113:2113"
     environment:
       PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:?set PIPELINE_REDIS_URL}
       STARTING_URL: ${SPIDER_STARTING_URL:-https://en.wikipedia.org/wiki/Web_crawler}
       SPIDER_HTTP_TIMEOUT_SECONDS: ${SPIDER_HTTP_TIMEOUT_SECONDS:-10}
       SPIDER_HTTP_MAX_BODY_BYTES: ${SPIDER_HTTP_MAX_BODY_BYTES:-2097152}
       SPIDER_HTTP_USER_AGENT: "${SPIDER_HTTP_USER_AGENT:-MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)}"
+      SPIDER_METRICS_ENABLED: ${SPIDER_METRICS_ENABLED:-true}
+      SPIDER_METRICS_ADDR: ${SPIDER_METRICS_ADDR:-:2113}
     depends_on:
       - pipeline-redis
     restart: unless-stopped

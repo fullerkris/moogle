@@ -52,6 +52,8 @@ eval "$("${EXPORT_SCRIPT}" "${ENVIRONMENT}" query-engine)"
 : "${SPIDER_HTTP_TIMEOUT_SECONDS:=10}"
 : "${SPIDER_HTTP_MAX_BODY_BYTES:=2097152}"
 : "${SPIDER_HTTP_USER_AGENT:=MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)}"
+: "${SPIDER_METRICS_ENABLED:=true}"
+: "${SPIDER_METRICS_ADDR:=:2113}"
 
 : "${TFIDF_OPERATIONS_THRESHOLD:=1000}"
 : "${TFIDF_NUM_THREADS:=4}"

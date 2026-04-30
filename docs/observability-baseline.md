@@ -2,6 +2,8 @@
 
 This baseline adds first-pass observability assets for production migration.
 
+Threshold source of truth: `docs/slo-threshold-registry.md`.
+
 ## Included Assets
 
 - `observability/docker-compose.yml`: local Prometheus + Grafana stack
@@ -36,6 +38,7 @@ scripts/kubectl-with-config.sh k8s/kubeconfig.local.yaml rollout restart deploym
 This now applies:
 
 - ServiceMonitor resources for `query-engine-metrics` and `runtime-metrics`.
+- ServiceMonitor resource for `spider-metrics` (active when a `spider-metrics` service exists in namespace `moogle`).
 - A minimal local `Prometheus` custom resource (`moogle-local`) that scrapes ServiceMonitors in namespace `moogle`.
 - Namespaced RBAC (`ServiceAccount`/`Role`/`RoleBinding`) for service/endpoints/pod discovery.
 
@@ -52,6 +55,8 @@ Follow-up tuning:
 - Redis memory critical > 90%
 - Backup freshness critical if no successful backup in 26h
 
+Use warning and critical values from `docs/slo-threshold-registry.md` when adding/updating alert rules.
+
 ## Notes
 
 - Query-engine now exposes `/metrics` from Laravel for request count + latency histogram metrics.
@@ -59,3 +64,14 @@ Follow-up tuning:
 - Runtime exporter emits queue depth, oldest message age, Redis memory usage/capacity, and optional backup freshness.
 - Grafana now auto-loads the starter runtime dashboard from provisioning at container startup.
 - Runtime exporter image publish flow is automated in `.github/workflows/build-docker-images.yml` (`build-runtime-metrics-exporter`).
+- Spider now exports native Prometheus metrics at `/metrics` (default `:2113`) for fetch outcomes, enqueue results, policy decisions, bypass events, and budget remaining.
+- Local Prometheus scrapes Spider metrics via `host.docker.internal:2113`; ensure the Spider runtime publishes `127.0.0.1:2113:2113`.
+
+## Spider PromQL Quick Queries
+
+- Fetch success rate (pages/sec): `sum(rate(moogle_spider_fetch_total{result="success"}[5m]))`
+- Timeout ratio: `sum(rate(moogle_spider_fetch_total{result="timeout"}[5m])) / clamp_min(sum(rate(moogle_spider_fetch_total[5m])), 1)`
+- Enqueue reject ratio (excluding duplicate): `sum(rate(moogle_spider_enqueue_total{result="rejected",reason!="duplicate"}[5m])) / clamp_min(sum(rate(moogle_spider_enqueue_total[5m])), 1)`
+- Policy deny rate: `sum(rate(moogle_spider_policy_decision_total{decision="deny"}[5m]))`
+- Bypass usage share: `sum(rate(moogle_spider_bypass_total{result="granted"}[5m])) / clamp_min(sum(rate(moogle_spider_fetch_total[5m])), 1)`
+- Fetch p95 duration: `histogram_quantile(0.95, sum(rate(moogle_spider_fetch_duration_seconds_bucket[5m])) by (le))`

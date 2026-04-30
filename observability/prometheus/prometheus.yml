@@ -16,7 +16,7 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - spider-service:8080
+          - host.docker.internal:2113
 
   - job_name: pipeline-workers
     metrics_path: /metrics

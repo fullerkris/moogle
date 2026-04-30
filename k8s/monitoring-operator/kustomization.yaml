@@ -9,3 +9,4 @@ resources:
   - prometheus-local.yaml
   - servicemonitor-query-engine-metrics.yaml
   - servicemonitor-runtime-metrics.yaml
+  - servicemonitor-spider-metrics.yaml
