@@ -512,6 +512,33 @@ Bypass safety should ensure:
 - bypass remains visible in logs and metrics
 - bypassed domains cannot monopolize the queue
 
+## 9.13 Bypass governance contract
+
+Bypass entries must be explicitly governed and time-bounded.
+
+Each bypass entry should include:
+
+- `domain`
+- `requested_by`
+- `approved_by`
+- `justification`
+- `created_at` (UTC)
+- `expires_at` (UTC)
+- `review_ticket`
+
+Governance rules:
+
+- default max approval window: 90 days
+- expired entries must be treated as not bypassed
+- recertification required before expiration
+- blocklist always overrides bypass approvals
+- all bypass changes must be auditable (ticket/linkable change record)
+
+Operational recommendation:
+
+- review active bypass list weekly
+- include bypass count + upcoming expirations in weekly readiness review
+
 # 10. Frontier Prioritization
 
 ## 10.1 Objective
@@ -864,25 +891,9 @@ That is enough to move the spider from a narrow seed demo into a real controlled
 
 # 19. Suggested Initial Defaults
 
-```env
-STARTING_URLS=https://en.wikipedia.org/wiki/Web_crawler,https://news.ycombinator.com/
-CRAWL_MODE=allowlist
-ALLOWED_DOMAINS=en.wikipedia.org,news.ycombinator.com,arstechnica.com,lobste.rs
-BLOCKED_DOMAINS=facebook.com,instagram.com,localhost
+Use the canonical example in section **11.2 Example environment mapping**.
 
-ROBOTS_ENABLED=true
-ROBOTS_CACHE_TTL_SECONDS=3600
-DEFAULT_CRAWL_DELAY_MS=2000
-MAX_CONCURRENT_PER_DOMAIN=1
-ROBOTS_ALLOW_ON_FETCH_FAILURE=true
-
-ROBOTS_BYPASS_DOMAINS=reddit.com,www.reddit.com,old.reddit.com
-ROBOTS_BYPASS_SUBDOMAINS=true
-ROBOTS_BYPASS_DELAY_MS=1500
-
-BYPASS_MAX_PAGES_PER_HOST=5000
-BYPASS_MAX_QUEUE_SHARE_PERCENT=20
-```
+To avoid drift, keep only that single env snippet updated when defaults change.
 
 # 20. Suggested Follow-On Engineering Tasks
 

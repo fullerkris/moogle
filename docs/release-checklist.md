@@ -2,6 +2,14 @@
 
 Use this checklist for every production release.
 
+Note: this is an execution-time checklist. Keep items unchecked in git, and check them during each release window.
+
+References:
+
+- SLO thresholds: `docs/slo-threshold-registry.md`
+- Smoke suite: `docs/smoke-suite.md`
+- DB migration contract: `docs/db-migration-safety-contract.md`
+
 ## Release Metadata
 
 - Release owner:
@@ -18,7 +26,7 @@ Use this checklist for every production release.
   - [ ] multi-language tests
   - [ ] build
   - [ ] vulnerability scan
-  - [ ] smoke
+  - [ ] smoke (per `docs/smoke-suite.md`)
 - [ ] Images built and tagged with immutable digest.
 - [ ] Release notes drafted (scope, risks, rollback target).
 - [ ] Staging deploy completed from same artifact(s).
@@ -30,7 +38,8 @@ Use this checklist for every production release.
 
 - [ ] Confirm environment is `dev -> staging -> production` promoted artifact, not rebuilt artifact.
 - [ ] Confirm secrets are current (<= 180 days old) and not expiring during release window.
-- [ ] Confirm migration scripts (if any) are backward-compatible.
+- [ ] Confirm migration scripts (if any) follow `docs/db-migration-safety-contract.md`.
+- [ ] Confirm each migration step has a rollback path or approved mitigation.
 - [ ] Confirm on-call engineer is available.
 - [ ] Confirm communication channel active (incident/release room).
 
@@ -42,7 +51,7 @@ Use this checklist for every production release.
   - [ ] p95 latency
   - [ ] queue depth/lag
   - [ ] restart loops
-- [ ] Advance rollout only if metrics remain within SLO thresholds.
+- [ ] Advance rollout only if metrics remain within thresholds in `docs/slo-threshold-registry.md`.
 
 ## 4) Post-Deploy Validation
 
@@ -56,10 +65,11 @@ Use this checklist for every production release.
 
 Rollback immediately if any of the following persist beyond 10 minutes:
 
-- [ ] Error rate exceeds SLO/error budget burn threshold.
-- [ ] API p95 latency exceeds release threshold.
-- [ ] Queue backlog grows continuously with consumer degradation.
-- [ ] Critical user path fails smoke tests.
+- [ ] Query API 5xx ratio > 3% (5m window).
+- [ ] Query API p95 latency > 800ms (5m window).
+- [ ] Queue depth > 50,000 and rising (15m) or oldest message age > 15m.
+- [ ] Critical worker restart count >= 6 in 10m.
+- [ ] Critical user path fails smoke tests (`docs/smoke-suite.md`).
 
 ## 6) Sign-Off
 

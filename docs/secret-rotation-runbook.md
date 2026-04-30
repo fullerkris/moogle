@@ -1,5 +1,7 @@
 # Secret Rotation Runbook
 
+Note: the validation checklist is run during each rotation event and should remain unchecked in git between rotations.
+
 ## Policy
 
 - Scheduled rotation interval: 180 days.
@@ -14,6 +16,12 @@
 - Service validation owner: Service owner
 - Incident communication owner: Incident commander or release manager
 
+## Automation and Tracking Expectations
+
+- Secret age is reviewed weekly in the readiness scorecard (`docs/weekly-readiness-scorecard-template.md`).
+- Any secret older than 180 days must generate a tracked rotation task.
+- Each rotation event must record evidence links in the rotation register.
+
 ## Scheduled Rotation Procedure
 
 1. Create replacement credentials/tokens.
@@ -23,6 +31,7 @@
 5. Promote changes to production.
 6. Revoke old credentials.
 7. Record rotation timestamp and evidence.
+8. Update rotation register entry (path, owner, rotated at, next due, evidence).
 
 ## Emergency Rotation Procedure
 
@@ -40,6 +49,7 @@
 - [ ] Readiness checks successful (`/api/health/ready`).
 - [ ] Authenticated DB/Redis operations succeed.
 - [ ] No critical alerts triggered after rollout.
+- [ ] Rotation register updated with links to evidence.
 
 ## Evidence to Capture
 
@@ -48,3 +58,9 @@
 - Service restart timestamps
 - Smoke test output
 - Incident/release links
+
+## Rotation Register Template
+
+| Secret path | Owner | Rotated at (UTC) | Next due (UTC) | Evidence link |
+|---|---|---|---|---|
+| `secret/moogle/<env>/<service>` |  |  |  |  |

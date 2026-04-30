@@ -253,14 +253,16 @@ Each ticket includes clear Definition of Done (DoD) so implementation can start 
 
 ### F2. Staging smoke suite + rollback runbook
 - **DoD**
-  - Smoke tests run on every staging deploy.
-  - Rollback steps tested and documented.
+  - Smoke suite is defined in `docs/smoke-suite.md` and runs on every staging deploy.
+  - Rollback steps tested and documented in `docs/rollback-runbook.md`.
 
 ### F3. Governance documentation pack
 - **DoD**
   - `docs/release-checklist.md` exists and is usable by release manager.
   - `docs/rollback-runbook.md` exists with validated rollback steps.
   - `docs/incident-comms-template.md` exists for incident updates.
+  - `docs/slo-threshold-registry.md` is the threshold source of truth referenced by release/rollback docs.
+  - `docs/db-migration-safety-contract.md` is referenced by release/rollback migration gates.
 
 ---
 

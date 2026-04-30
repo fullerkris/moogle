@@ -6,7 +6,7 @@ This document introduces the first deployable runtime baseline for both target p
 
 - Compose profile: `deploy/compose/docker-compose.prod.yml`
 - Ingress: Caddy with a hardened baseline in `deploy/compose/Caddyfile`
-- Public exposure: Caddy only (`:80`)
+- Public exposure: Caddy only (`:80` for local baseline; `80/443` in production with TLS termination)
 - Internal services: query-engine app runtime, spider/indexer/image-indexer/backlinks/tfidf/page-rank workers, isolated query Redis, isolated pipeline Redis, MongoDB
 
 Run locally:
@@ -21,6 +21,7 @@ Notes:
 
 - `run-prod-compose.sh` exports shared + `query-engine` secrets from Vault and enforces required env contracts.
 - Compose services expose `*.internal` aliases (`pipeline-redis.internal`, `query-redis.internal`, `mongo.internal`) to match the shared Vault URL contract.
+- Spider metrics are exposed on loopback only (`127.0.0.1:2113`) for local scrape without public internet exposure.
 
 ## Kubernetes Baseline (Kustomize)
 

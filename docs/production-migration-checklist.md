@@ -14,6 +14,9 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - Redis role contract: `PIPELINE_REDIS_URL` is required for broker/queue workloads; query cache/session must not share that keyspace.
 - Reliability targets: keep current starter RPO/RTO/SLO values and tune after production telemetry.
 - Release governance: PR-only to `main`, required checks (multi-language tests + build + vulnerability scan + smoke), and environment flow `dev -> staging -> production`.
+- Threshold source of truth: `docs/slo-threshold-registry.md`.
+- Smoke suite definition: `docs/smoke-suite.md`.
+- DB migration safety contract: `docs/db-migration-safety-contract.md`.
 
 ## Current Baseline (from this branch)
 
@@ -148,7 +151,7 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 
 ### Spider (Go)
 
-- [ ] Enforce crawl budgets and domain rate limits.
+- [ ] Enforce crawl budgets and domain rate limits. (partial: domain policy + robots + per-domain politeness controls are implemented; crawl budget quotas/limits still pending.)
 - [x] Set bounded queue insertion to prevent broker overload.
 - [ ] Add metrics for fetched pages/sec, timeout rate, and enqueue failures.
 
@@ -184,6 +187,9 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - [ ] Data gate: backup + restore drill completed within RPO/RTO targets.
 - [ ] Operations gate: on-call runbook validated by engineer not authoring the change.
 - [ ] Governance gate: release checklist, rollback runbook, and incident comms template are present and reviewed. (partial: all three docs are present in `docs/`; formal review/sign-off evidence is pending.)
+- [x] Threshold registry documented and linked in governance docs.
+- [x] Smoke suite definition + ownership documented.
+- [x] DB migration safety contract documented.
 
 ---
 
