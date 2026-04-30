@@ -7,20 +7,37 @@ data:
     :80 {
         encode gzip zstd
 
+        header {
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            X-Frame-Options "SAMEORIGIN"
+            X-Content-Type-Options "nosniff"
+            Referrer-Policy "strict-origin-when-cross-origin"
+        }
+
         @api path /api/*
-        reverse_proxy @api query-engine:9000 {
-            transport fastcgi {
-                split .php
-                read_timeout 30s
-                write_timeout 30s
+        handle @api {
+            rewrite * /index.php
+            reverse_proxy query-engine:9000 {
+                transport fastcgi {
+                    split .php
+                    env SCRIPT_FILENAME /var/www/public/index.php
+                    env DOCUMENT_ROOT /var/www/public
+                    read_timeout 30s
+                    write_timeout 30s
+                }
             }
         }
 
-        reverse_proxy query-engine:9000 {
-            transport fastcgi {
-                split .php
-                read_timeout 30s
-                write_timeout 30s
+        handle {
+            rewrite * /index.php
+            reverse_proxy query-engine:9000 {
+                transport fastcgi {
+                    split .php
+                    env SCRIPT_FILENAME /var/www/public/index.php
+                    env DOCUMENT_ROOT /var/www/public
+                    read_timeout 30s
+                    write_timeout 30s
+                }
             }
         }
     }

@@ -13,6 +13,21 @@ services:
             - QUERY_REDIS_URL=redis://redis:6379/0
             - CACHE_REDIS_URL=redis://redis:6379/1
             - REDIS_HOST=redis
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD-SHELL", "php -v >/dev/null 2>&1 && test -f /var/www/public/build/manifest.json"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 20s
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.00"
+                    memory: 1024M
+                reservations:
+                    cpus: "0.25"
+                    memory: 256M
         networks:
             - app
 
@@ -28,6 +43,21 @@ services:
             - caddy_config:/config
         depends_on:
             - laravel
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD-SHELL", "caddy version >/dev/null 2>&1"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.50"
+                    memory: 256M
+                reservations:
+                    cpus: "0.10"
+                    memory: 128M
         networks:
             - app
 
@@ -37,6 +67,21 @@ services:
             - "6379:6379"
         volumes:
             - redis_data:/data
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.50"
+                    memory: 512M
+                reservations:
+                    cpus: "0.10"
+                    memory: 128M
         networks:
             - app
 

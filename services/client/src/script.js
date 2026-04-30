@@ -1,5 +1,4 @@
-const backendURL = `https://api.moogle.app/api`;
-// const backendURL = `http://127.0.0.1:8000/api`;
+const backendURL = import.meta.env.VITE_BACKEND_URL || `${window.location.protocol}//${window.location.hostname}/api`;
 
 document.addEventListener("DOMContentLoaded", () => {
   const searchButton = document.getElementById("search-button");
