@@ -116,6 +116,3 @@ Useful commands:
 scripts/spin-up-local.sh status
 scripts/spin-up-local.sh down
 ```
-
-## Notes
-The documentation is a work in progress. I'll update it once I finish writing my thesis. For now, please refer to the code and comments in each service for more information on how to use them.
