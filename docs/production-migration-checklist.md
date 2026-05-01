@@ -53,8 +53,8 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 
 ### 4) Safety Controls
 
-- [ ] Add health/readiness checks to all containers/services. (partial: health endpoints/probes exist for query-engine and core k8s components; full service coverage is incomplete.)
-- [ ] Add per-service CPU/memory limits and restart policies. (partial: restart policies are set in compose and query-engine has k8s limits; not all services have explicit limits.)
+- [ ] Add health/readiness checks to all containers/services. (partial: production compose now covers service probes and health-gated startup ordering; full runtime-wide readiness coverage is still incomplete.)
+- [ ] Add per-service CPU/memory limits and restart policies. (partial: production compose now sets VM-enforced CPU/memory/PID caps alongside restart policies; remaining runtime targets still need full parity.)
 - [ ] Confirm strict HTTP/database timeouts and bounded retries in each language runtime. (partial: spider HTTP timeout controls exist; cross-service retry/backoff standards are not fully implemented.)
 
 ### 5) Data Protection
@@ -123,10 +123,10 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - [ ] Create environment-specific compose files: (partial: `docker-compose.prod.yml` exists; `docker-compose.dev.yml` is still missing.)
   - `docker-compose.dev.yml`
   - `docker-compose.prod.yml`
-- [ ] In prod compose: (partial: bind mounts/dev commands are addressed; healthchecks and resource constraints are still incomplete.)
+- [x] In prod compose:
   - remove bind mounts for application code
   - disable dev server commands
-  - attach healthchecks and resource constraints
+  - attach healthchecks, health-gated dependencies, and VM-enforced resource constraints
 
 ### Environment Variable Clarity
 

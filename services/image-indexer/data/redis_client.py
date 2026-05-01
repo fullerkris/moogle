@@ -45,6 +45,18 @@ class RedisClient:
             logger.error(f"Failed to connect to redis: {e}")
             self.client = None
 
+    def ping(self) -> bool:
+        if self.client is None:
+            logger.error("Redis connection not initialized")
+            return False
+
+        try:
+            self.client.ping()
+            return True
+        except Exception as e:
+            logger.error(f"Redis ping failed: {e}")
+            return False
+
     # --------------------- MESSAGE QUEUE ---------------------
     def pop_image(self) -> Optional[str]:
         try:

@@ -246,6 +246,18 @@ class MongoClient:
             logger.error(f"Failed to connect to mongo")
             self.client = None
 
+    def ping(self) -> bool:
+        if self.client is None:
+            logger.error("Mongo connection not initialized")
+            return False
+
+        try:
+            self.client.admin.command("ping")
+            return True
+        except Exception as e:
+            logger.error(f"Mongo ping failed: {e}")
+            return False
+
     def perform_batch_operations(
         self, operations: List[UpdateOne], collection_name: str
     ):

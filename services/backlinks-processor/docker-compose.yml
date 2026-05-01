@@ -11,7 +11,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q main.py"]
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health/ready' % os.getenv('BACKLINKS_PROCESSOR_HEALTH_PORT', '2116'))\""]
       interval: 30s
       timeout: 5s
       retries: 3

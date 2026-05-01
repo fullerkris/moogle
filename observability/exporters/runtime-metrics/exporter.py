@@ -1,4 +1,5 @@
 import os
+import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -28,6 +29,8 @@ state = {
         "query": 0,
     },
     "backup_last_success_timestamp_seconds": None,
+    "last_collection_success_timestamp_seconds": None,
+    "last_collection_error": "",
 }
 
 
@@ -86,9 +89,13 @@ def _collector_loop():
     while True:
         try:
             _collect_metrics()
-        except Exception:
+            with state_lock:
+                state["last_collection_success_timestamp_seconds"] = time.time()
+                state["last_collection_error"] = ""
+        except Exception as exc:
             with state_lock:
                 state["exporter_up"] = 0
+                state["last_collection_error"] = str(exc)
         time.sleep(max(1, SCRAPE_INTERVAL_SECONDS))
 
 
@@ -154,8 +161,79 @@ def _render_metrics():
     return "\n".join(lines) + "\n"
 
 
+def _ready_window_seconds():
+    return max(10, SCRAPE_INTERVAL_SECONDS * 3)
+
+
+def _readiness_snapshot():
+    with state_lock:
+        snapshot = {
+            "exporter_up": state["exporter_up"],
+            "last_collection_success_timestamp_seconds": state[
+                "last_collection_success_timestamp_seconds"
+            ],
+            "last_collection_error": state["last_collection_error"],
+        }
+
+    last_success = snapshot["last_collection_success_timestamp_seconds"]
+    last_success_age_seconds = None
+    if last_success is not None:
+        last_success_age_seconds = max(0.0, time.time() - last_success)
+
+    is_ready = (
+        snapshot["exporter_up"] == 1
+        and last_success_age_seconds is not None
+        and last_success_age_seconds <= _ready_window_seconds()
+    )
+
+    return {
+        "is_ready": is_ready,
+        "last_success_age_seconds": last_success_age_seconds,
+        "last_collection_error": snapshot["last_collection_error"],
+    }
+
+
+def _write_json(handler, status_code, payload):
+    body = json.dumps(payload).encode("utf-8")
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 class MetricsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/health/live":
+            _write_json(
+                self,
+                200,
+                {
+                    "status": "up",
+                    "service": "runtime-metrics-exporter",
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+            )
+            return
+
+        if self.path == "/health/ready":
+            snapshot = _readiness_snapshot()
+            _write_json(
+                self,
+                200 if snapshot["is_ready"] else 503,
+                {
+                    "status": "ready" if snapshot["is_ready"] else "not_ready",
+                    "service": "runtime-metrics-exporter",
+                    "dependencies": {
+                        "collection_loop": snapshot["is_ready"],
+                    },
+                    "last_success_age_seconds": snapshot["last_success_age_seconds"],
+                    "last_collection_error": snapshot["last_collection_error"],
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+            )
+            return
+
         if self.path != "/metrics":
             self.send_response(404)
             self.end_headers()

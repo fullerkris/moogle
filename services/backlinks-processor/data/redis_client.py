@@ -44,6 +44,18 @@ class RedisClient:
             logger.error(f"Failed to connect to redis: {e}")
             self.client = None
 
+    def ping(self) -> bool:
+        if self.client is None:
+            logger.error("Redis connection not initialized")
+            return False
+
+        try:
+            self.client.ping()
+            return True
+        except Exception as e:
+            logger.error(f"Redis ping failed: {e}")
+            return False
+
     # --------------------- BACKLINKS ---------------------
     def get_all_backlinks_keys(self) -> Optional[List[str]]:
         if self.client is None:

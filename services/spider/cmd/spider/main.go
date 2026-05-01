@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"net"
@@ -9,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/IonelPopJara/search-engine/services/spider/internal/controllers"
@@ -19,6 +22,70 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+type spiderHealthState struct {
+	startupComplete atomic.Bool
+}
+
+func writeProbeJSON(w http.ResponseWriter, statusCode int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		log.Printf("Could not encode probe payload: %v", err)
+	}
+}
+
+func startProbeServer(probeAddr string, metricsEnabled bool, db *database.Database, health *spiderHealthState) {
+	mux := http.NewServeMux()
+
+	if metricsEnabled {
+		mux.Handle("/metrics", promhttp.Handler())
+	}
+
+	mux.HandleFunc("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		writeProbeJSON(w, http.StatusOK, map[string]any{
+			"status":    "up",
+			"service":   "spider",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+
+	mux.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		dependencies := map[string]bool{
+			"startup_complete": health != nil && health.startupComplete.Load(),
+			"pipeline_redis":  false,
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		if err := db.Ping(ctx); err == nil {
+			dependencies["pipeline_redis"] = true
+		}
+
+		isReady := dependencies["startup_complete"] && dependencies["pipeline_redis"]
+		statusCode := http.StatusOK
+		status := "ready"
+		if !isReady {
+			statusCode = http.StatusServiceUnavailable
+			status = "not_ready"
+		}
+
+		writeProbeJSON(w, statusCode, map[string]any{
+			"status":       status,
+			"service":      "spider",
+			"dependencies": dependencies,
+			"timestamp":    time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+
+	go func() {
+		log.Printf("Spider probe server listening on %s", probeAddr)
+		if err := http.ListenAndServe(probeAddr, mux); err != nil {
+			log.Printf("Spider probe server stopped: %v", err)
+		}
+	}()
+}
 
 // getEnv retrieves the value of an environment variable or returns a fallback value if not set.
 func getEnv(key, fallback string) string {
@@ -173,18 +240,11 @@ func main() {
 	var spiderMetrics *crawler.SpiderMetrics
 	if metricsEnabled {
 		spiderMetrics = crawler.NewSpiderMetrics(prometheus.DefaultRegisterer)
-		go func() {
-			metricsMux := http.NewServeMux()
-			metricsMux.Handle("/metrics", promhttp.Handler())
-			log.Printf("Spider metrics endpoint listening on %s/metrics", metricsAddr)
-			if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
-				log.Printf("Spider metrics server stopped: %v", err)
-			}
-		}()
 	}
 
 	// Connect to Redis
 	db := &database.Database{}
+	health := &spiderHealthState{}
 	var err error
 	if pipelineRedisURL != "" {
 		err = db.ConnectToRedisURL(pipelineRedisURL)
@@ -201,9 +261,15 @@ func main() {
 		return
 	}
 
+	startProbeServer(metricsAddr, metricsEnabled, db, health)
+
 	// Add an entry to the message queue with score 0 (high priority)
-	db.PushURL(startingURL, 0)
-	log.Printf("PUSH %v\n", startingURL)
+	if err := db.PushURL(startingURL, 0); err != nil {
+		log.Printf("Could not seed starting URL %q: %v", startingURL, err)
+	} else {
+		log.Printf("PUSH %v\n", startingURL)
+	}
+	health.startupComplete.Store(true)
 
 	// Instantiate controllers
 	pageController := controllers.NewPageController(db)

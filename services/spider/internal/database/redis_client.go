@@ -93,6 +93,23 @@ func (db *Database) ConnectToRedisURL(redisURL string) error {
 	return db.connectRedis(options)
 }
 
+func (db *Database) Ping(ctx context.Context) error {
+	if db == nil || db.Client == nil {
+		return fmt.Errorf("redis client is not initialized")
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	_, err := db.Client.Ping(ctx).Result()
+	if err != nil {
+		return fmt.Errorf("could not ping redis: %w", err)
+	}
+
+	return nil
+}
+
 // ------------------- REDIS SETUP -------------------
 
 // ------------------- CRAWL LINKS -------------------
