@@ -89,6 +89,10 @@ Before applying overlays, create a namespaced Vault token secret used by the Sec
 kubectl -n moogle create secret generic vault-token --from-literal=token='<vault-read-token>'
 ```
 
+For end-to-end bootstrap and rollout validation, use:
+
+- `docs/k8s-secret-bootstrap.md`
+
 ## Security Notes
 
 - Local config disables TLS (`tls_disable = 1`) for developer bootstrap only.

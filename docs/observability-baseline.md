@@ -48,14 +48,16 @@ Follow-up tuning:
 
 ## Alert Baseline Targets
 
-- Query-engine 5xx ratio critical > 3% (5m)
-- Query-engine p95 latency critical > 800ms (5m)
-- Queue depth critical > 50,000 (15m)
-- Oldest queue message critical > 15m
-- Redis memory critical > 90%
-- Backup freshness critical if no successful backup in 26h
+- Query-engine 5xx ratio: warning > 1% (5m), critical > 3% (5m)
+- Query-engine p95 latency: warning > 400ms (10m), critical > 800ms (5m)
+- Queue depth: warning > 10,000 and rising (15m), critical > 50,000 and rising (15m)
+- Oldest queue message age: warning > 5m (5m), critical > 15m (5m)
+- Worker restarts (per service): warning >= 3 (10m), critical >= 6 (10m)
+- Redis memory usage: warning > 75% (5m), critical > 90% (5m)
+- Pipeline Redis evictions: critical any eviction (> 0) over 5m
+- Backup freshness: critical when last successful backup > 26h
 
-Use warning and critical values from `docs/slo-threshold-registry.md` when adding/updating alert rules.
+Use values from `docs/slo-threshold-registry.md` as the source of truth when adding/updating alert rules.
 
 ## Notes
 

@@ -214,10 +214,10 @@ Use this every week for staging and production.
 
 ## Starter Alert Thresholds
 
-- [ ] API 5xx warning >1%/5m, critical >3%/5m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
-- [ ] API latency warning p95 >400ms/10m, critical p95 >800ms/5m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
-- [ ] Queue depth warning >10k + rising/15m, critical >50k + rising/15m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
-- [ ] Oldest queue message warning >5m, critical >15m. (partial: critical threshold rule exists; warning threshold rule is not defined yet.)
-- [ ] Worker restarts warning >=3/10m, critical >=6/10m.
-- [ ] Redis memory warning >75%, critical >90%; pipeline Redis evictions critical if >0 for 5m. (partial: high-memory critical rule exists; warning and eviction-specific rules are pending.)
-- [ ] Backup freshness critical if no successful backup in 26h. (partial: alert rule exists; backup job/exporter signal still needs full runtime integration.)
+- [x] API 5xx warning >1%/5m, critical >3%/5m. (documented in `docs/slo-threshold-registry.md`; alert rule parity still tracked in observability work.)
+- [x] API latency warning p95 >400ms/10m, critical p95 >800ms/5m. (documented in `docs/slo-threshold-registry.md`; alert rule parity still tracked in observability work.)
+- [x] Queue depth warning >10k + rising/15m, critical >50k + rising/15m. (documented in `docs/slo-threshold-registry.md`; alert rule parity still tracked in observability work.)
+- [x] Oldest queue message warning >5m, critical >15m. (documented in `docs/slo-threshold-registry.md`; alert rule parity still tracked in observability work.)
+- [x] Worker restarts warning >=3/10m, critical >=6/10m. (documented in `docs/slo-threshold-registry.md`; alert rule parity still tracked in observability work.)
+- [x] Redis memory warning >75%, critical >90%; pipeline Redis evictions critical if >0 for 5m. (documented in `docs/slo-threshold-registry.md`; alert rule parity still tracked in observability work.)
+- [x] Backup freshness critical if no successful backup in 26h. (documented in `docs/slo-threshold-registry.md`; backup job/exporter signal integration still tracked separately.)

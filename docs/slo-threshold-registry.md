@@ -19,12 +19,12 @@ Use these values in:
 | Signal | Warning | Critical (Release/Rollback Gate) | Window | Notes |
 |---|---:|---:|---|---|
 | Query API 5xx ratio | > 1% | > 3% | 5m | Critical sustained breach triggers rollback review. |
-| Query API p95 latency | > 400ms | > 800ms | 5m to 10m | Use same query mix as smoke/load baseline. |
+| Query API p95 latency | > 400ms | > 800ms | warning 10m / critical 5m | Use same query mix as smoke/load baseline. |
 | Queue depth (pages queue) | > 10,000 and rising | > 50,000 and rising | 15m | Rising trend required to avoid false alarms. |
-| Oldest queue message age | > 5m | > 15m | instant + 5m confirm | Indicates consumer lag or stalled workers. |
+| Oldest queue message age | > 5m | > 15m | warning 5m / critical 5m | Indicates consumer lag or stalled workers. |
 | Worker restart count (per service) | >= 3 | >= 6 | 10m | Count by deployment/service. |
 | Redis memory usage | > 75% | > 90% | 5m | Track query and pipeline Redis separately. |
-| Pipeline Redis evictions | any (> 0) | any (> 0) | 5m | Treated as critical for pipeline durability. |
+| Pipeline Redis evictions | n/a | any (> 0) | 5m | Any eviction on pipeline Redis is treated as critical for durability. |
 | Backup freshness | n/a | last successful backup > 26h | instant | Hard stop for production releases. |
 
 ## Spider Starter Thresholds
@@ -51,3 +51,4 @@ Tune these after 2-4 weeks of production telemetry.
 | Date (UTC) | Change | Author | Approvers |
 |---|---|---|---|
 | 2026-04-27 | Initial threshold registry baseline. |  |  |
+| 2026-05-01 | Added explicit warning/critical windows and finalized starter alert threshold definitions (API, queue, restarts, Redis, backup freshness). |  |  |

@@ -79,6 +79,10 @@ Prerequisites:
 kubectl -n moogle create secret generic vault-token --from-literal=token='<vault-read-token>'
 ```
 
+Operational runbook:
+
+- `docs/k8s-secret-bootstrap.md`
+
 ## Runtime Metrics Image and Scrape Notes
 
 - `runtime-metrics-exporter` image is published to GHCR as `ghcr.io/ionelpopjara/moogle/runtime-metrics-exporter`.
