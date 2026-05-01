@@ -5,6 +5,8 @@ namespace: moogle
 resources:
   - namespace.yaml
   - configmap.yaml
+  - secretstore-vault.yaml
+  - externalsecret-runtime-secrets.yaml
   - configmap-caddy.yaml
   - deployment-query-engine.yaml
   - service-query-engine.yaml

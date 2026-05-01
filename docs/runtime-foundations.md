@@ -59,9 +59,25 @@ kustomize build k8s/overlays/dev | kubectl apply -f -
 
 ## Follow-up Items
 
-- Integrate Vault secret references into Kubernetes overlays.
 - Add MongoDB operator/managed database strategy for HA.
 - Wire TLS cert management (cert-manager) for production ingress.
+
+## Kubernetes Secrets (Vault via External Secrets)
+
+- Base manifests now include:
+  - `k8s/base/secretstore-vault.yaml`
+  - `k8s/base/externalsecret-runtime-secrets.yaml`
+- Runtime deployments consume sensitive values from `moogle-runtime-secrets` (Kubernetes `Secret`) instead of `ConfigMap`.
+- Overlays patch Vault paths per environment (`moogle/dev/*`, `moogle/staging/*`, `moogle/prod/*`).
+
+Prerequisites:
+
+- External Secrets Operator must be installed in cluster.
+- A Vault token secret must exist in the `moogle` namespace:
+
+```bash
+kubectl -n moogle create secret generic vault-token --from-literal=token='<vault-read-token>'
+```
 
 ## Runtime Metrics Image and Scrape Notes
 

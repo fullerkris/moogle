@@ -100,7 +100,7 @@ scripts/benchmark-crawler.sh --duration 90 --interval 10
 
 Requirements:
 - Create `variables.env` for each service under `services/*/` (spider/indexer/image-indexer/backlinks-processor/page-rank/tfidf).
-- Shared infra is started by script (`redis`, `mongo`). For container-to-container access, service env should point to these hosts (for example `REDIS_HOST=redis`, and equivalent Mongo host/URI using `mongo`).
+- Shared infra is started by script (`redis`, `mongo`). Pipeline services must set `PIPELINE_REDIS_URL=redis://redis:6379/0` for container-to-container access.
 
 ### One-command local project spin-up
 

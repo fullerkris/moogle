@@ -14,10 +14,6 @@ The recommended way to run the TF-IDF Processor is with Docker. This ensures all
 2. **Configure Environment Variables**:  
    Create a `variables.env` file in the `services/tfidf` directory with the following content (adjust as needed):
    ```env
-   REDIS_HOST=<your_redis_host>
-   REDIS_PORT=<your_redis_port>         # default: 6379
-   REDIS_PASSWORD=<your_redis_password> # default: empty
-   REDIS_DB=<your_redis_db>             # default: 0
    MONGO_HOST=<your_mongo_host>
    MONGO_PORT=<your_mongo_port>         # default: 27017
    MONGO_DB=<your_mongo_db>             # default: test

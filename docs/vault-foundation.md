@@ -72,6 +72,23 @@ The local bootstrap seeds shared Redis/Mongo URLs using `*.internal` hostnames, 
 - Use External Secrets Operator and a Vault provider initially.
 - Later migration to AWS Secrets Manager/Azure Key Vault only changes backend provider mapping; app contracts remain stable.
 
+### Kubernetes wiring in this repo
+
+- Secret store and runtime secret manifests:
+  - `k8s/base/secretstore-vault.yaml`
+  - `k8s/base/externalsecret-runtime-secrets.yaml`
+- Query-engine and runtime-metrics deployments consume `moogle-runtime-secrets` via `envFrom.secretRef`.
+- Overlay-specific Vault paths are defined in:
+  - `k8s/overlays/dev/kustomization.yaml`
+  - `k8s/overlays/staging/kustomization.yaml`
+  - `k8s/overlays/prod/kustomization.yaml`
+
+Before applying overlays, create a namespaced Vault token secret used by the SecretStore auth:
+
+```bash
+kubectl -n moogle create secret generic vault-token --from-literal=token='<vault-read-token>'
+```
+
 ## Security Notes
 
 - Local config disables TLS (`tls_disable = 1`) for developer bootstrap only.

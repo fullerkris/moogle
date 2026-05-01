@@ -161,11 +161,6 @@ func main() {
 
 	// Retrieve environment variables
 	pipelineRedisURL := strings.TrimSpace(os.Getenv("PIPELINE_REDIS_URL"))
-	redisHost := getEnv("REDIS_HOST", "localhost")
-	redisPort := getEnv("REDIS_PORT", "6379")
-	redisPassword := getEnv("REDIS_PASSWORD", "")
-	redisDB := getEnv("REDIS_DB", "0")
-	allowRedisFallback := getEnvBool("ALLOW_REDIS_HOST_FALLBACK", false)
 	startingURL := getEnv("STARTING_URL", "https://en.wikipedia.org/wiki/Kamen_Rider")
 	httpTimeoutSeconds := getEnvInt("SPIDER_HTTP_TIMEOUT_SECONDS", utils.DefaultHTTPTimeoutSeconds)
 	httpMaxBodyBytes := getEnvInt("SPIDER_HTTP_MAX_BODY_BYTES", utils.DefaultHTTPMaxBodyBytes)
@@ -245,17 +240,12 @@ func main() {
 	// Connect to Redis
 	db := &database.Database{}
 	health := &spiderHealthState{}
-	var err error
-	if pipelineRedisURL != "" {
-		err = db.ConnectToRedisURL(pipelineRedisURL)
-	} else {
-		if !allowRedisFallback {
-			log.Println("PIPELINE_REDIS_URL is required. Set ALLOW_REDIS_HOST_FALLBACK=true to use REDIS_HOST/REDIS_PORT fallback")
-			return
-		}
-		log.Println("PIPELINE_REDIS_URL not set, falling back to REDIS_HOST/REDIS_PORT")
-		err = db.ConnectToRedis(redisHost, redisPort, redisPassword, redisDB)
+	if pipelineRedisURL == "" {
+		log.Println("PIPELINE_REDIS_URL is required")
+		return
 	}
+
+	err := db.ConnectToRedisURL(pipelineRedisURL)
 	if err != nil {
 		log.Printf("Error: %v\n", err)
 		return

@@ -26,3 +26,69 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 2
+  - target:
+      kind: ExternalSecret
+      name: moogle-runtime-secrets
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: vault-backend-staging
+      - op: replace
+        path: /spec/data
+        value:
+          - secretKey: PIPELINE_REDIS_URL
+            remoteRef:
+              key: moogle/staging/shared
+              property: PIPELINE_REDIS_URL
+          - secretKey: QUERY_REDIS_URL
+            remoteRef:
+              key: moogle/staging/shared
+              property: QUERY_REDIS_URL
+          - secretKey: CACHE_REDIS_URL
+            remoteRef:
+              key: moogle/staging/shared
+              property: CACHE_REDIS_URL
+          - secretKey: MONGODB_URI
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGODB_URI
+          - secretKey: MONGODB_DATABASE
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGODB_DATABASE
+          - secretKey: MONGO_HOST
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_HOST
+          - secretKey: MONGO_PORT
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_PORT
+          - secretKey: MONGO_DB
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_DB
+          - secretKey: MONGO_USERNAME
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_USERNAME
+          - secretKey: MONGO_PASSWORD
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_PASSWORD
+          - secretKey: MONGO_INITDB_ROOT_USERNAME
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_INITDB_ROOT_USERNAME
+          - secretKey: MONGO_INITDB_ROOT_PASSWORD
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGO_INITDB_ROOT_PASSWORD
+          - secretKey: APP_KEY
+            remoteRef:
+              key: moogle/staging/query-engine
+              property: APP_KEY
+          - secretKey: APP_URL
+            remoteRef:
+              key: moogle/staging/query-engine
+              property: APP_URL

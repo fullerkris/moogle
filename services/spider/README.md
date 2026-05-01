@@ -17,10 +17,7 @@ Recent improvements in this service include:
 Create a `variables.env` file in `services/spider`.
 
 ```env
-REDIS_HOST=<your_redis_host>
-REDIS_PORT=<your_redis_port>                # default: 6379
-REDIS_PASSWORD=<your_redis_password>        # default: empty
-REDIS_DB=<your_redis_db>                    # default: 0
+PIPELINE_REDIS_URL=redis://<your_redis_host>:<your_redis_port>/<db>
 STARTING_URL=<your_starting_url>            # default: https://en.wikipedia.org/wiki/Kamen_Rider
 
 SPIDER_HTTP_TIMEOUT_SECONDS=<seconds>       # default: 10

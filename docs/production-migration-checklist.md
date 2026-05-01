@@ -130,10 +130,10 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 
 ### Environment Variable Clarity
 
-- [ ] Replace ambiguous Redis vars with explicit names: (partial: explicit vars are adopted in production compose/runtime wrappers and core services; legacy fallback vars remain in several services.)
+- [x] Replace ambiguous Redis vars with explicit names across pipeline services and runtime contracts.
   - `PIPELINE_REDIS_URL` (required)
   - `QUERY_REDIS_URL` (optional/isolated for query cache-session workloads)
-- [ ] Add startup validation that fails fast if required vars are missing. (partial: required-env validation now exists for spider/indexer/image-indexer/backlinks and production compose contract; full cross-service enforcement is not yet universal.)
+- [x] Add startup validation that fails fast if required vars are missing for pipeline Redis and production compose env contracts.
 
 ### Query-Engine Asset Reliability
 

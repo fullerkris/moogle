@@ -12,7 +12,6 @@ services:
             - APP_DEBUG=true
             - QUERY_REDIS_URL=redis://redis:6379/0
             - CACHE_REDIS_URL=redis://redis:6379/1
-            - REDIS_HOST=redis
         restart: unless-stopped
         healthcheck:
             test: ["CMD-SHELL", "php -v >/dev/null 2>&1 && test -f /var/www/public/build/manifest.json"]

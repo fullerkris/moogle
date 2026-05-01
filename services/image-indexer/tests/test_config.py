@@ -25,27 +25,22 @@ class ConfigParsingTests(unittest.TestCase):
 
         self.assertEqual(config, {"redis_url": "redis://redis:6379/0"})
 
-    def test_redis_invalid_db_raises_value_error(self):
+    def test_redis_strips_pipeline_url(self):
         with patch.dict(
             os.environ,
             {
-                "ALLOW_REDIS_HOST_FALLBACK": "true",
-                "REDIS_HOST": "redis",
-                "REDIS_PORT": "6379",
-                "REDIS_DB": "invalid-db",
+                "PIPELINE_REDIS_URL": "  redis://redis:6379/7  ",
             },
             clear=True,
         ):
-            with self.assertRaisesRegex(ValueError, "REDIS_DB"):
-                image_indexer_config.get_redis_config(LoggerStub())
+            config = image_indexer_config.get_redis_config(LoggerStub())
 
-    def test_redis_requires_pipeline_url_when_fallback_disabled(self):
+        self.assertEqual(config, {"redis_url": "redis://redis:6379/7"})
+
+    def test_redis_requires_pipeline_url(self):
         with patch.dict(
             os.environ,
-            {
-                "REDIS_HOST": "redis",
-                "REDIS_PORT": "6379",
-            },
+            {},
             clear=True,
         ):
             with self.assertRaisesRegex(ValueError, "PIPELINE_REDIS_URL"):

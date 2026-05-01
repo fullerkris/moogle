@@ -14,10 +14,7 @@ The recommended way to run the Image Indexer is with Docker. This ensures all de
 2. **Configure Environment Variables**:  
    Create a `variables.env` file in the `services/image-indexer` directory with the following content (adjust as needed):
    ```env
-   REDIS_HOST=<your_redis_host>
-   REDIS_PORT=<your_redis_port>         # default: 6379
-   REDIS_PASSWORD=<your_redis_password> # default: empty
-   REDIS_DB=<your_redis_db>             # default: 0
+   PIPELINE_REDIS_URL=redis://<your_redis_host>:<your_redis_port>/<db>
    MONGO_HOST=<your_mongo_host>
    MONGO_PORT=<your_mongo_port>         # default: 27017
    MONGO_DB=<your_mongo_db>             # default: test

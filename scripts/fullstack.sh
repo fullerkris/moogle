@@ -28,7 +28,7 @@ Commands:
 Notes:
   - Each service requires services/<name>/variables.env.
   - Recommended env hosts inside containers on this stack network:
-      REDIS_HOST=redis
+      PIPELINE_REDIS_URL=redis://redis:6379/0
       MONGO_HOST=mongo (or equivalent mongo connection settings per service)
   - Project name can be overridden with MOOGLE_PROJECT_NAME.
 EOF

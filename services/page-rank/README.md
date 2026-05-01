@@ -74,7 +74,7 @@ If you prefer to run the Page Rank service without Docker, you can do so by buil
    Press `Ctrl + C` in the terminal to stop the process.
 
 **Note:**  
-- Make sure Redis is running and accessible with the credentials you provided.
+- Make sure MongoDB is running and accessible with the credentials you provided.
 - You may need to install Go dependencies using `go mod tidy` before building.
 
 For development or debugging, you can also run the Page Rank service directly:

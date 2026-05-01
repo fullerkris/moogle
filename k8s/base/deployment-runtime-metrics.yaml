@@ -20,6 +20,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: moogle-runtime
+            - secretRef:
+                name: moogle-runtime-secrets
           readinessProbe:
             httpGet:
               path: /health/ready

@@ -31,9 +31,8 @@ The recommended way to run the Query Engine is with Docker. This ensures all dep
 
    MONGODB_URI=mongodb://<mongo_user>:<mongo_password>@<mongo_host>:<mongo_port>/<mongo_db>?authSource=admin
    MONGODB_DATABASE=<mongo_db>
-   REDIS_HOST=<your_redis_host>
-   REDIS_PASSWORD=<your_redis_password>
-   REDIS_PORT=<your_redis_port>
+   QUERY_REDIS_URL=redis://<query_redis_host>:<query_redis_port>/0
+   CACHE_REDIS_URL=redis://<query_redis_host>:<query_redis_port>/1
    ```
 
 3. **Build and Run**:  
