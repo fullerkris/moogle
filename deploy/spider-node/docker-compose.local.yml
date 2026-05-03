@@ -1,0 +1,25 @@
+services:
+  spider-node:
+    depends_on:
+      pipeline-redis:
+        condition: service_healthy
+    environment:
+      PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:-redis://pipeline-redis:6379/0}
+
+  pipeline-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - ${PIPELINE_REDIS_PORT_BIND:-127.0.0.1:16379}:6379
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - pipeline_redis_data:/data
+
+volumes:
+  pipeline_redis_data:

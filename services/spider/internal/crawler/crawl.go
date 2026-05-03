@@ -113,8 +113,11 @@ func (crawcfg *CrawlerConfig) fetchPage(rawCurrentURL string, normalizedCurrentU
 
 	release := crawcfg.Policy.Acquire(decision.Host, decision.Delay)
 	startedAt := time.Now()
-	html, statusCode, contentType, err := getPageData(rawCurrentURL)
+	html, statusCode, contentType, usedRedditJSONFallback, err := getPageDataWithRedditFallback(rawCurrentURL)
 	release()
+	if usedRedditJSONFallback {
+		log.Printf("event=reddit_json_fetch_fallback_applied url=%s host=%s", rawCurrentURL, decision.Host)
+	}
 	crawcfg.observeFetch(classifyFetchResult(statusCode, err), statusCode, time.Since(startedAt))
 
 	if crawcfg.Budget != nil {
@@ -138,6 +141,30 @@ func (crawcfg *CrawlerConfig) processFetchedPage(
 	outgoingLinks, imagesMap, err := getURLsFromHTML(html, rawCurrentURL)
 	if err != nil {
 		return fmt.Errorf("error getting links from HTML: %w", err)
+	}
+
+	html, outgoingLinks, imagesMap, err = func() (string, []string, map[string]map[string]string, error) {
+		enrichedLinks, enrichedImages, enrichedHTML, enrichErr := enrichRedditPage(rawCurrentURL, html, outgoingLinks, imagesMap)
+		if enrichErr != nil {
+			log.Printf("Reddit JSON fallback unavailable for %s: %v", rawCurrentURL, enrichErr)
+			return html, outgoingLinks, imagesMap, nil
+		}
+
+		replacedHTML := enrichedHTML != html
+		if isRedditURL(rawCurrentURL) && (replacedHTML || len(enrichedLinks) > len(outgoingLinks) || len(enrichedImages) > len(imagesMap)) {
+			log.Printf(
+				"event=reddit_json_enrichment_applied url=%s replaced_html=%t added_links=%d added_images=%d",
+				rawCurrentURL,
+				replacedHTML,
+				len(enrichedLinks)-len(outgoingLinks),
+				len(enrichedImages)-len(imagesMap),
+			)
+		}
+
+		return enrichedHTML, enrichedLinks, enrichedImages, nil
+	}()
+	if err != nil {
+		return err
 	}
 
 	crawcfg.AddImages(normalizedCurrentURL, imagesMap)
