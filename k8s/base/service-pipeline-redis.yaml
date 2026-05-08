@@ -3,6 +3,7 @@ kind: Service
 metadata:
   name: pipeline-redis
 spec:
+  type: ClusterIP
   selector:
     app: pipeline-redis
   ports:

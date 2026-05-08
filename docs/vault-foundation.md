@@ -98,10 +98,20 @@ For end-to-end bootstrap and rollout validation, use:
 - Local config disables TLS (`tls_disable = 1`) for developer bootstrap only.
 - Production Vault must run with TLS, KMS auto-unseal, audit logging, and policy least privilege.
 - Required secret contract for production compose includes:
+  - `CADDY_SITE_ADDRESS`
   - `APP_KEY`, `APP_URL`
-  - `PIPELINE_REDIS_URL`, `QUERY_REDIS_URL`, `CACHE_REDIS_URL`
-  - `MONGODB_URI`, `MONGODB_DATABASE`
+  - `PIPELINE_REDIS_PASSWORD`, `PIPELINE_REDIS_URL`, `QUERY_REDIS_URL`, `CACHE_REDIS_URL`
+  - `MONGODB_URI`, `MONGODB_DATABASE`, `MONGODB_QUERY_USERNAME`, `MONGODB_QUERY_PASSWORD`
   - `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`
   - `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USERNAME`, `MONGO_PASSWORD`
   - `SPIDER_STARTING_URL`, `SPIDER_HTTP_TIMEOUT_SECONDS`, `SPIDER_HTTP_MAX_BODY_BYTES`, `SPIDER_HTTP_USER_AGENT`
   - `TFIDF_OPERATIONS_THRESHOLD`, `TFIDF_NUM_THREADS`
+  - `SECRET_ROTATION_DAYS`, `SECRET_ROTATION_OWNER`, `SECRET_ROTATED_AT`
+
+Validate the deployed Vault contract before rollout:
+
+```bash
+VAULT_ADDR=https://vault.example.com \
+VAULT_TOKEN=<read-token> \
+scripts/ops/validate-secret-readiness.sh prod
+```

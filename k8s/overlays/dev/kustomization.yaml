@@ -33,6 +33,10 @@ patches:
             remoteRef:
               key: moogle/dev/shared
               property: PIPELINE_REDIS_URL
+          - secretKey: PIPELINE_REDIS_PASSWORD
+            remoteRef:
+              key: moogle/dev/shared
+              property: PIPELINE_REDIS_PASSWORD
           - secretKey: QUERY_REDIS_URL
             remoteRef:
               key: moogle/dev/shared
@@ -49,6 +53,14 @@ patches:
             remoteRef:
               key: moogle/dev/shared
               property: MONGODB_DATABASE
+          - secretKey: MONGODB_QUERY_USERNAME
+            remoteRef:
+              key: moogle/dev/shared
+              property: MONGODB_QUERY_USERNAME
+          - secretKey: MONGODB_QUERY_PASSWORD
+            remoteRef:
+              key: moogle/dev/shared
+              property: MONGODB_QUERY_PASSWORD
           - secretKey: MONGO_HOST
             remoteRef:
               key: moogle/dev/shared

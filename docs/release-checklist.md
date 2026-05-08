@@ -38,10 +38,12 @@ References:
 
 - [ ] Confirm environment is `dev -> staging -> production` promoted artifact, not rebuilt artifact.
 - [ ] Confirm secrets are current (<= 180 days old) and not expiring during release window.
+- [ ] Secret readiness validation passed: `scripts/ops/validate-secret-readiness.sh prod`.
 - [ ] Confirm migration scripts (if any) follow `docs/db-migration-safety-contract.md`.
 - [ ] Confirm each migration step has a rollback path or approved mitigation.
 - [ ] Confirm on-call engineer is available.
 - [ ] Confirm communication channel active (incident/release room).
+- [ ] Runtime exposure validation passed per `docs/runtime-exposure-validation.md`.
 
 ## 3) Deploy Steps
 

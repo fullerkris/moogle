@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tfidf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tfidf
+  template:
+    metadata:
+      labels:
+        app: tfidf
+    spec:
+      containers:
+        - name: tfidf
+          image: ghcr.io/ionelpopjara/moogle/tfidf:latest
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_HOST
+            - name: MONGO_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PORT
+            - name: MONGO_DB
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_DB
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_USERNAME
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PASSWORD
+            - name: OPERATIONS_THRESHOLD
+              value: "1000"
+            - name: NUM_THREADS
+              value: "4"
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, pymongo; pymongo.MongoClient(host=os.environ['MONGO_HOST'], port=int(os.environ.get('MONGO_PORT','27017')), username=os.environ['MONGO_USERNAME'], password=os.environ['MONGO_PASSWORD']).admin.command('ping')"
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, pymongo; pymongo.MongoClient(host=os.environ['MONGO_HOST'], port=int(os.environ.get('MONGO_PORT','27017')), username=os.environ['MONGO_USERNAME'], password=os.environ['MONGO_PASSWORD']).admin.command('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 192Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi

@@ -1,0 +1,4 @@
+services:
+  pipeline-redis:
+    ports:
+      - "${PIPELINE_REDIS_PRIVATE_BIND_IP:?set PIPELINE_REDIS_PRIVATE_BIND_IP}:${PIPELINE_REDIS_PRIVATE_PORT:-16379}:6379"

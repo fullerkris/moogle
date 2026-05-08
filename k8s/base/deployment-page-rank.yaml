@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: page-rank
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: page-rank
+  template:
+    metadata:
+      labels:
+        app: page-rank
+    spec:
+      containers:
+        - name: page-rank
+          image: ghcr.io/ionelpopjara/moogle/page-rank:latest
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_HOST
+            - name: MONGO_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PORT
+            - name: MONGO_DB
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_DB
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_USERNAME
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PASSWORD
+          # No HTTP health endpoint exposed by this Go binary. Add probes here once
+          # the service exposes a /health/ready endpoint (see checklist A5).
+          resources:
+            requests:
+              cpu: 200m
+              memory: 192Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi

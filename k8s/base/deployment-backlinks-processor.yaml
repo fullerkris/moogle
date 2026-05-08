@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backlinks-processor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backlinks-processor
+  template:
+    metadata:
+      labels:
+        app: backlinks-processor
+    spec:
+      containers:
+        - name: backlinks-processor
+          image: ghcr.io/ionelpopjara/moogle/backlinks-processor:latest
+          ports:
+            - containerPort: 2116
+              name: health
+          env:
+            - name: BACKLINKS_PROCESSOR_HEALTH_PORT
+              value: "2116"
+            - name: PIPELINE_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: PIPELINE_REDIS_URL
+            - name: MONGO_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_HOST
+            - name: MONGO_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PORT
+            - name: MONGO_DB
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_DB
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_USERNAME
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 2116
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/ready
+              port: 2116
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi

@@ -17,14 +17,16 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - Threshold source of truth: `docs/slo-threshold-registry.md`.
 - Smoke suite definition: `docs/smoke-suite.md`.
 - DB migration safety contract: `docs/db-migration-safety-contract.md`.
+- Runtime exposure validation: `docs/runtime-exposure-validation.md`.
 
 ## Current Baseline (from this branch)
 
 - Polyglot services: Go (`spider`, `page-rank`), Python (`indexer`, `image-indexer`, `backlinks-processor`, `tfidf`), Laravel (`query-engine`), Vite (`client`), Rust (`monitoring`).
 - Two Redis roles are active and should remain explicit:
-  - Pipeline Redis (`moogle-redis`, currently exposed as host `:6380`)
-  - Query-engine Redis (`query-engine-redis-1`, currently exposed as host `:6379`)
-- Query engine serves at `http://localhost`; client now containerized and configurable via `VITE_BACKEND_URL`.
+  - Pipeline Redis (`pipeline-redis.internal`, internal by default; private host publishing requires `deploy/compose/docker-compose.private-redis.yml`)
+  - Query-engine Redis (`query-redis.internal`, internal-only)
+- **Redis durability tradeoff**: both Redis instances run with `--save ""` and `--appendonly no` (no disk persistence, pure in-memory). Pipeline queue items lost to a crash or OOM restart are unrecoverable without a checkpoint/replay mechanism. This is a deliberate throughput tradeoff; the zero-eviction SLO threshold in `docs/slo-threshold-registry.md` is the operational bound. If unbounded pipeline RPO becomes unacceptable, evaluate AOF persistence on pipeline-redis or implement Epic D3 (checkpoint/replay) first.
+- Query engine is served through the ingress/reverse-proxy path; client remains containerized and configurable via `VITE_BACKEND_URL`.
 
 ---
 
@@ -38,29 +40,29 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 
 ### 2) Network and Access Hardening
 
-- [ ] Expose only ingress/reverse proxy (80/443) to public network. (partial: ingress baselines exist in VM/K8s manifests; environment exposure policy still needs runtime validation.)
-- [ ] VM ingress standard: Caddy edge reverse proxy with hardened TLS config. (partial: Caddy baseline and hardening headers exist; TLS termination/HTTPS redirect still pending in deploy config.)
-- [ ] Kubernetes ingress standard: NGINX Ingress Controller + cert-manager. (partial: `ingressClassName: nginx` is set; cert-manager wiring is not present yet.)
+- [ ] Expose only ingress/reverse proxy (80/443) to public network. (partial: VM prod compose now publishes only Caddy `80/443` by default; K8s services remain ClusterIP behind Ingress; runtime firewall/LB validation still required.)
+- [ ] VM ingress standard: Caddy edge reverse proxy with hardened TLS config. (partial: Caddy exposes `80/443`, persists cert state, and supports automatic HTTPS via `CADDY_SITE_ADDRESS`; production DNS/TLS issuance still needs runtime validation.)
+- [ ] Kubernetes ingress standard: NGINX Ingress Controller + cert-manager. (partial: `ingressClassName: nginx`, TLS sections, cert-manager cluster-issuer annotations, and forced HTTPS redirect are configured; cluster issuer/DNS validation still required.)
 - [x] Keep MongoDB and Redis internal-only (no public port mappings in prod).
-- [ ] Add network segmentation so pipeline workers cannot access query-only Redis/cache unless required.
+- [x] Add network segmentation so pipeline workers cannot access query-only Redis/cache unless required.
 
 ### 3) Secrets and Credentials
 
 - [ ] Move production secrets out of checked-in `.env` files. (partial: production compose now uses env contracts instead of checked-in env files; remaining rollout needs environment-wide validation.)
-- [ ] Use Vault as source-of-truth for Mongo/Redis credentials and keys. (partial: Vault bootstrap/export scripts + `run-prod-compose.sh` exist for query + pipeline runtime paths; environment adoption and rotation evidence remain.)
-- [ ] Separate DB users by role (query read-only vs pipeline write users).
-- [ ] Enforce 180-day secret rotation schedule with owner + runbook. (partial: policy and runbook are documented; automated enforcement/evidence tracking is still pending.)
+- [ ] Use Vault as source-of-truth for Mongo/Redis credentials and keys. (partial: Vault bootstrap/export scripts + `run-prod-compose.sh` exist for query + pipeline runtime paths; `scripts/ops/validate-secret-readiness.sh` validates the live Vault contract; environment adoption evidence remains.)
+- [x] Separate DB users by role (query read-only vs pipeline write users).
+- [ ] Enforce 180-day secret rotation schedule with owner + runbook. (partial: policy, runbook, and `SECRET_ROTATED_AT`/owner validation are implemented; production evidence register still needs live entries.)
 
 ### 4) Safety Controls
 
-- [ ] Add health/readiness checks to all containers/services. (partial: production compose now covers service probes and health-gated startup ordering; full runtime-wide readiness coverage is still incomplete.)
-- [ ] Add per-service CPU/memory limits and restart policies. (partial: production compose now sets VM-enforced CPU/memory/PID caps alongside restart policies; remaining runtime targets still need full parity.)
-- [ ] Confirm strict HTTP/database timeouts and bounded retries in each language runtime. (partial: spider HTTP timeout controls exist; cross-service retry/backoff standards are not fully implemented.)
+- [x] Add health/readiness checks to all containers/services. (Compose: all services covered; tfidf upgraded to pymongo ping, page-rank upgraded to bash /dev/tcp Mongo connectivity check. K8s: spider/indexer/image-indexer/backlinks-processor use httpGet probes; tfidf uses exec pymongo ping; page-rank has no probe pending a health endpoint — see A5.)
+- [x] Add per-service CPU/memory limits and restart policies. (Compose: all services have CPU/memory/PID caps; tfidf and page-rank restart policy corrected from `on-failure` to `unless-stopped`. K8s: all Deployment manifests include resource requests and limits.)
+- [ ] Confirm strict HTTP/database timeouts and bounded retries in each language runtime. (partial: spider HTTP timeout controls exist; cross-service retry/backoff standards are not fully implemented — see Phase 1 Epic D2.)
 
 ### 5) Data Protection
 
-- [ ] Implement daily Mongo backup job.
-- [ ] Run and document weekly restore test in non-prod.
+- [x] Implement daily Mongo backup job. (Compose: `mongo-backup` service in `docker-compose.prod.yml` using `deploy/compose/scripts/mongo-backup.sh`; K8s: `cronjob-mongo-backup.yaml` + `pvc-mongo-backup.yaml` in `k8s/base/`.)
+- [ ] Run and document weekly restore test in non-prod. (runtime: requires live environment with populated backup volume.)
 
 ---
 
@@ -123,6 +125,7 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - [ ] Create environment-specific compose files: (partial: `docker-compose.prod.yml` exists; `docker-compose.dev.yml` is still missing.)
   - `docker-compose.dev.yml`
   - `docker-compose.prod.yml`
+- [x] Add K8s Deployment manifests for all pipeline workers. (Added: `deployment-spider.yaml`, `deployment-indexer.yaml`, `deployment-image-indexer.yaml`, `deployment-backlinks-processor.yaml`, `deployment-tfidf.yaml`, `deployment-page-rank.yaml` — all wired into `k8s/base/kustomization.yaml`. Full-stack K8s deployment is now possible. page-rank probes pending a health endpoint — see A5.)
 - [x] In prod compose:
   - remove bind mounts for application code
   - disable dev server commands
@@ -160,6 +163,8 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - [x] Ensure all write paths are idempotent (upsert or unique constraints).
 - [ ] Apply backoff with jitter on transient Mongo/Redis errors.
 - [ ] Add dead-letter handling for unparseable payloads.
+- [x] Replace fragile process-name health probes with functional checks. (tfidf now uses a pymongo ping to verify Mongo connectivity; page-rank now uses bash /dev/tcp TCP check to Mongo port. K8s tfidf uses exec pymongo ping. page-rank K8s probe pending a health endpoint — see A5.)
+- [x] Change restart policy from `on-failure` to `unless-stopped` for pipeline workers. (Fixed for tfidf and page-rank in `docker-compose.prod.yml`.)
 
 ### Page-Rank (Go)
 
@@ -171,6 +176,10 @@ Tagging note: unchecked items with `(partial: ...)` have some implementation in-
 - [x] Add `healthz` and dependency-aware `readyz` endpoints (implemented as `/api/health/live` and `/api/health/ready`).
 - [ ] Add request rate limiting at edge/API gateway.
 - [ ] Use cache key versioning for rank/index updates.
+
+### Monitoring (Rust)
+
+- [ ] Monitoring service is currently non-functional — it is a placeholder not updated for the current architecture. Without it there is no automated service-respawning safety net beyond Docker/K8s restart policies. Decide before production: rewrite to integrate with current service topology, replace with an external health management approach, or formally remove and document the gap.
 
 ### Client (Vite)
 

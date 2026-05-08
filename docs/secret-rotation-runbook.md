@@ -45,6 +45,14 @@ Note: the validation checklist is run during each rotation event and should rema
 
 ## Validation Checklist
 
+- [ ] Vault contract validation passes:
+
+```bash
+VAULT_ADDR=https://vault.example.com \
+VAULT_TOKEN=<read-token> \
+scripts/ops/validate-secret-readiness.sh prod
+```
+
 - [ ] Affected services healthy (`/api/health/live`).
 - [ ] Readiness checks successful (`/api/health/ready`).
 - [ ] Authenticated DB/Redis operations succeed.
@@ -54,6 +62,7 @@ Note: the validation checklist is run during each rotation event and should rema
 ## Evidence to Capture
 
 - Vault path(s) updated
+- `scripts/ops/validate-secret-readiness.sh <env>` output
 - Old credential revocation confirmation
 - Service restart timestamps
 - Smoke test output

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spider
+  template:
+    metadata:
+      labels:
+        app: spider
+    spec:
+      containers:
+        - name: spider
+          image: ghcr.io/ionelpopjara/moogle/spider:latest
+          ports:
+            - containerPort: 2113
+              name: metrics
+          env:
+            - name: PIPELINE_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: PIPELINE_REDIS_URL
+            - name: STARTING_URL
+              value: "https://en.wikipedia.org/wiki/Web_crawler"
+            - name: SPIDER_CRAWL_MODE
+              value: "open"
+            - name: SPIDER_ALLOWLIST_DOMAINS
+              value: ""
+            - name: SPIDER_HTTP_TIMEOUT_SECONDS
+              value: "10"
+            - name: SPIDER_HTTP_MAX_BODY_BYTES
+              value: "2097152"
+            - name: SPIDER_HTTP_USER_AGENT
+              value: "MoogleSpider/1.0 (+https://github.com/IonelPopJara/search-engine)"
+            - name: SPIDER_METRICS_ENABLED
+              value: "true"
+            - name: SPIDER_METRICS_ADDR
+              value: ":2113"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 2113
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/ready
+              port: 2113
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi

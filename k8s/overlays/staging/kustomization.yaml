@@ -16,9 +16,21 @@ patches:
       kind: Ingress
       name: moogle-ingress
     patch: |-
+      - op: add
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-staging
+      - op: add
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1force-ssl-redirect
+        value: "true"
       - op: replace
         path: /spec/rules/0/host
-        value: staging.moogle.local
+        value: staging.moogle.example.com
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts:
+              - staging.moogle.example.com
+            secretName: moogle-staging-tls
   - target:
       kind: Deployment
       name: query-engine
@@ -40,6 +52,10 @@ patches:
             remoteRef:
               key: moogle/staging/shared
               property: PIPELINE_REDIS_URL
+          - secretKey: PIPELINE_REDIS_PASSWORD
+            remoteRef:
+              key: moogle/staging/shared
+              property: PIPELINE_REDIS_PASSWORD
           - secretKey: QUERY_REDIS_URL
             remoteRef:
               key: moogle/staging/shared
@@ -56,6 +72,14 @@ patches:
             remoteRef:
               key: moogle/staging/shared
               property: MONGODB_DATABASE
+          - secretKey: MONGODB_QUERY_USERNAME
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGODB_QUERY_USERNAME
+          - secretKey: MONGODB_QUERY_PASSWORD
+            remoteRef:
+              key: moogle/staging/shared
+              property: MONGODB_QUERY_PASSWORD
           - secretKey: MONGO_HOST
             remoteRef:
               key: moogle/staging/shared

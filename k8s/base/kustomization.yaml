@@ -17,6 +17,15 @@ resources:
   - service-query-redis.yaml
   - deployment-pipeline-redis.yaml
   - service-pipeline-redis.yaml
+  - networkpolicy-redis.yaml
   - deployment-runtime-metrics.yaml
   - service-runtime-metrics.yaml
+  - deployment-spider.yaml
+  - deployment-indexer.yaml
+  - deployment-image-indexer.yaml
+  - deployment-backlinks-processor.yaml
+  - deployment-tfidf.yaml
+  - deployment-page-rank.yaml
+  - pvc-mongo-backup.yaml
+  - cronjob-mongo-backup.yaml
   - ingress.yaml

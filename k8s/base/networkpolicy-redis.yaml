@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: query-redis-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: query-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: query-engine
+        - podSelector:
+            matchLabels:
+              app: runtime-metrics-exporter
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pipeline-redis-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: pipeline-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: runtime-metrics-exporter
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - spider
+                  - indexer
+                  - image-indexer
+                  - backlinks-processor
+      ports:
+        - protocol: TCP
+          port: 6379

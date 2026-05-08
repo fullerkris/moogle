@@ -15,6 +15,20 @@ spec:
       containers:
         - name: pipeline-redis
           image: redis:7-alpine
+          args:
+            - redis-server
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --requirepass
+            - $(PIPELINE_REDIS_PASSWORD)
+          env:
+            - name: PIPELINE_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: PIPELINE_REDIS_PASSWORD
           ports:
             - containerPort: 6379
           readinessProbe:

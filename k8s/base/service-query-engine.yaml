@@ -3,6 +3,7 @@ kind: Service
 metadata:
   name: query-engine
 spec:
+  type: ClusterIP
   selector:
     app: query-engine
   ports:

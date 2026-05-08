@@ -9,6 +9,7 @@ metadata:
     prometheus.io/path: /metrics
     prometheus.io/port: "80"
 spec:
+  type: ClusterIP
   selector:
     app: query-engine-caddy
   ports:

@@ -12,6 +12,16 @@ main `indexer`, `image-indexer`, and `backlinks-processor` already consume.
 
 ## Modes
 
+The wrapper script defaults to local mode and makes sure Compose reads
+`deploy/spider-node/.env` regardless of the directory you run it from:
+
+```bash
+scripts/spin-up-spider-node.sh up
+scripts/spin-up-spider-node.sh status
+scripts/spin-up-spider-node.sh logs
+scripts/spin-up-spider-node.sh down
+```
+
 ### Local prototype
 
 Use the local override file to spin up a bundled Redis broker alongside the spider node.
@@ -26,6 +36,12 @@ cp deploy/spider-node/.env.example deploy/spider-node/.env
 
 ```bash
 docker compose -f deploy/spider-node/docker-compose.yml -f deploy/spider-node/docker-compose.local.yml up --build -d
+```
+
+Or use the wrapper:
+
+```bash
+scripts/spin-up-spider-node.sh local up
 ```
 
 3. Check readiness:
@@ -54,7 +70,8 @@ SPIDER_CRAWL_MODE=allowlist
 SPIDER_ALLOWLIST_DOMAINS=reddit.com
 ```
 
-On the main server, the matching production settings are:
+On the main server, publish the pipeline Redis endpoint only on a private interface by adding
+the explicit private-Redis override file:
 
 ```env
 PIPELINE_REDIS_PASSWORD=replace-me
@@ -65,14 +82,21 @@ PIPELINE_REDIS_PRIVATE_PORT=16379
 Then start it with:
 
 ```bash
+docker compose -f deploy/compose/docker-compose.prod.yml -f deploy/compose/docker-compose.private-redis.yml up -d pipeline-redis
 docker compose -f deploy/spider-node/docker-compose.yml up --build -d
+```
+
+Or use the wrapper:
+
+```bash
+PIPELINE_REDIS_URL=redis://:replace-me@100.99.200.105:16379/0 scripts/spin-up-spider-node.sh remote up
 ```
 
 ## Private connectivity requirement
 
-The current production `pipeline-redis` in `deploy/compose/docker-compose.prod.yml` is only on
-the internal Docker bridge network. A remote spider node cannot reach it until you provide a
-private path, for example:
+The default production `pipeline-redis` in `deploy/compose/docker-compose.prod.yml` is only on
+the internal Docker bridge network. A remote spider node cannot reach it until you explicitly
+provide a private path, for example:
 
 1. Publish Redis on a private interface or Tailscale address.
 2. Put a TCP proxy in front of Redis on a private network.

@@ -3,8 +3,13 @@ services:
     image: caddy:2
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       laravel:
         condition: service_healthy
@@ -30,7 +35,7 @@ services:
           memory: 128M
     networks:
       - edge
-      - app
+      - query
 
   laravel:
     image: query-engine-image:latest
@@ -69,12 +74,11 @@ services:
           cpus: "0.25"
           memory: 256M
     networks:
-      - app
+      - query
+      - data
 
   spider:
     image: ghcr.io/ionelpopjara/moogle/spider:latest
-    ports:
-      - "127.0.0.1:2113:2113"
     environment:
       PIPELINE_REDIS_URL: ${PIPELINE_REDIS_URL:?set PIPELINE_REDIS_URL}
       STARTING_URL: ${SPIDER_STARTING_URL:-https://en.wikipedia.org/wiki/Web_crawler}
@@ -112,7 +116,7 @@ services:
           cpus: "0.25"
           memory: 256M
     networks:
-      - app
+      - pipeline
 
   indexer:
     image: ghcr.io/ionelpopjara/moogle/indexer:latest
@@ -150,7 +154,8 @@ services:
           cpus: "0.25"
           memory: 256M
     networks:
-      - app
+      - pipeline
+      - data
 
   image-indexer:
     image: ghcr.io/ionelpopjara/moogle/image-indexer:latest
@@ -188,7 +193,8 @@ services:
           cpus: "0.25"
           memory: 256M
     networks:
-      - app
+      - pipeline
+      - data
 
   backlinks-processor:
     image: ghcr.io/ionelpopjara/moogle/backlinks-processor:latest
@@ -226,7 +232,8 @@ services:
           cpus: "0.25"
           memory: 256M
     networks:
-      - app
+      - pipeline
+      - data
 
   tfidf:
     image: ghcr.io/ionelpopjara/moogle/tfidf:latest
@@ -241,17 +248,17 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-    restart: on-failure
+    restart: unless-stopped
     cpus: "0.75"
     mem_limit: 768M
     mem_reservation: 192M
     pids_limit: 256
     healthcheck:
-      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q main.py"]
+      test: ["CMD-SHELL", "python -c \"import os, pymongo; pymongo.MongoClient(host=os.getenv('MONGO_HOST','mongo'), port=int(os.getenv('MONGO_PORT','27017')), username=os.getenv('MONGO_USERNAME'), password=os.getenv('MONGO_PASSWORD')).admin.command('ping')\""]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -262,29 +269,30 @@ services:
           cpus: "0.20"
           memory: 192M
     networks:
-      - app
+      - data
 
   page-rank:
     image: ghcr.io/ionelpopjara/moogle/page-rank:latest
     environment:
       MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
       MONGO_DB: ${MONGO_DB:-moogle}
       MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
       MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
     depends_on:
       mongo:
         condition: service_healthy
-    restart: on-failure
+    restart: unless-stopped
     cpus: "0.75"
     mem_limit: 768M
     mem_reservation: 192M
     pids_limit: 256
     healthcheck:
-      test: ["CMD-SHELL", "test -r /proc/1/cmdline && tr '\\000' ' ' < /proc/1/cmdline | grep -q page-rank"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/${MONGO_HOST:-mongo}/${MONGO_PORT:-27017}' 2>/dev/null"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -295,7 +303,40 @@ services:
           cpus: "0.20"
           memory: 192M
     networks:
-      - app
+      - data
+
+  mongo-backup:
+    image: mongo:7
+    entrypoint: ["/bin/bash", "/scripts/backup.sh"]
+    environment:
+      MONGO_HOST: ${MONGO_HOST:-mongo.internal}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?set MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD}
+      BACKUP_ROOT: /backup
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./scripts/mongo-backup.sh:/scripts/backup.sh:ro
+      - mongo_backup:/backup
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    cpus: "0.50"
+    mem_limit: 512M
+    mem_reservation: 128M
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+          pids: 128
+        reservations:
+          cpus: "0.05"
+          memory: 128M
+    networks:
+      - data
 
   query-redis:
     image: redis:7-alpine
@@ -323,7 +364,7 @@ services:
     volumes:
       - query_redis_data:/data
     networks:
-      app:
+      query:
         aliases:
           - query-redis.internal
 
@@ -332,8 +373,6 @@ services:
     command: ["redis-server", "--save", "", "--appendonly", "no", "--requirepass", "${PIPELINE_REDIS_PASSWORD:?set PIPELINE_REDIS_PASSWORD}"]
     environment:
       PIPELINE_REDIS_PASSWORD: ${PIPELINE_REDIS_PASSWORD:?set PIPELINE_REDIS_PASSWORD}
-    ports:
-      - "${PIPELINE_REDIS_PRIVATE_BIND_IP:-127.0.0.1}:${PIPELINE_REDIS_PRIVATE_PORT:-16379}:6379"
     restart: unless-stopped
     cpus: "0.50"
     mem_limit: 512M
@@ -357,7 +396,7 @@ services:
     volumes:
       - pipeline_redis_data:/data
     networks:
-      app:
+      pipeline:
         aliases:
           - pipeline-redis.internal
 
@@ -366,6 +405,11 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?set MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:?set MONGODB_DATABASE}
+      MONGODB_QUERY_USERNAME: ${MONGODB_QUERY_USERNAME:?set MONGODB_QUERY_USERNAME}
+      MONGODB_QUERY_PASSWORD: ${MONGODB_QUERY_PASSWORD:?set MONGODB_QUERY_PASSWORD}
+      MONGO_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
     restart: unless-stopped
     cpus: "1.00"
     mem_limit: 1024M
@@ -388,18 +432,26 @@ services:
           memory: 256M
     volumes:
       - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
     networks:
-      app:
+      data:
         aliases:
           - mongo.internal
 
 networks:
   edge:
     driver: bridge
-  app:
+  query:
+    driver: bridge
+  pipeline:
+    driver: bridge
+  data:
     driver: bridge
 
 volumes:
+  caddy_data:
+  caddy_config:
   mongo_data:
+  mongo_backup:
   query_redis_data:
   pipeline_redis_data:

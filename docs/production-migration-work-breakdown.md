@@ -29,6 +29,7 @@ These are now baseline constraints for implementation.
    - `PIPELINE_REDIS_URL` is mandatory for crawl/index queues and broker workloads.
    - Queue/broker keys must never be mixed with query cache/session keys.
    - If a second Redis is used for query cache/session, it must be explicitly configured and isolated.
+   - **Durability tradeoff (accepted)**: both Redis instances run without disk persistence (`--save ""`, `--appendonly no`). Pipeline queue items are lost on restart without a checkpoint/replay mechanism. The zero-eviction SLO threshold in `docs/slo-threshold-registry.md` is the operational bound for this risk. If unbounded pipeline RPO becomes unacceptable, revisit AOF persistence on pipeline-redis or implement Epic D3 first.
 
 5. **Initial reliability targets**
    - RPO/RTO/SLO starter values from migration plan are accepted for initial rollout and can be tuned later.
@@ -175,6 +176,19 @@ Each ticket includes clear Definition of Done (DoD) so implementation can start 
   - CPU/memory limits defined for each service.
   - Restart behavior defined and tested.
 
+### A4. Add K8s Deployment manifests for pipeline workers
+- **DoD**
+  - Deployment manifests exist in `k8s/base/` for: spider, indexer, image-indexer, backlinks-processor, tfidf, and page-rank.
+  - All pipeline worker Deployments are listed in `k8s/base/kustomization.yaml`.
+  - All three environment overlays (dev/staging/prod) apply without manifest conflicts.
+  - `kubectl apply -k k8s/overlays/<env>` alone reaches a full-stack pipeline-ready state, not query-only.
+
+### A5. Fix fragile health probes for TF-IDF and page-rank
+- **DoD**
+  - TF-IDF and page-rank health probes do not rely on `grep <process-name>` against `/proc/1/cmdline`.
+  - Replacement probes verify functional readiness (e.g., queue connectivity check, HTTP endpoint, or sentinel written by actual startup logic).
+  - All pipeline workers in prod compose use `restart: unless-stopped` (not `restart: on-failure`, which skips restarts after clean stops).
+
 ## Epic B - Secrets and Configuration Safety
 
 ### B1. Externalize secrets
@@ -268,9 +282,9 @@ Each ticket includes clear Definition of Done (DoD) so implementation can start 
 
 ## Dependency Order (Recommended)
 
-1. **A + B** first (safe runtime + safe config)
+1. **A + B** first (safe runtime + safe config) — includes A4 (K8s pipeline workers) and A5 (health probe hardening) as part of runtime completeness
 2. **C** second (repeatable secure builds)
-3. **D** third (data correctness and replay)
+3. **D** third (data correctness and replay) — D3 (checkpoint/replay) is a prerequisite if Redis no-persistence RPO becomes unacceptable
 4. **E** in parallel with D (visibility while hardening)
 5. **F** final gate to control releases
 

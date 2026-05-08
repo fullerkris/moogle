@@ -17,6 +17,14 @@ VAULT_TOKEN=<vault-token> \
 ./scripts/vault/run-prod-compose.sh staging up -d
 ```
 
+Before any staging or production spin-up, validate the live Vault contract:
+
+```bash
+VAULT_ADDR=https://vault.example.com \
+VAULT_TOKEN=<read-token> \
+scripts/ops/validate-secret-readiness.sh prod
+```
+
 Notes:
 
 - `run-prod-compose.sh` exports shared + `query-engine` secrets from Vault and enforces required env contracts.

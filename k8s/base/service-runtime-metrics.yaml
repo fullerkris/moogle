@@ -9,6 +9,7 @@ metadata:
     prometheus.io/path: /metrics
     prometheus.io/port: "9108"
 spec:
+  type: ClusterIP
   selector:
     app: runtime-metrics-exporter
   ports:

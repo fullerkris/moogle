@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-indexer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-indexer
+  template:
+    metadata:
+      labels:
+        app: image-indexer
+    spec:
+      containers:
+        - name: image-indexer
+          image: ghcr.io/ionelpopjara/moogle/image-indexer:latest
+          ports:
+            - containerPort: 2115
+              name: health
+          env:
+            - name: IMAGE_INDEXER_HEALTH_PORT
+              value: "2115"
+            - name: PIPELINE_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: PIPELINE_REDIS_URL
+            - name: MONGO_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_HOST
+            - name: MONGO_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PORT
+            - name: MONGO_DB
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_DB
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_USERNAME
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: moogle-runtime-secrets
+                  key: MONGO_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 2115
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/ready
+              port: 2115
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi

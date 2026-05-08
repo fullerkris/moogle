@@ -116,3 +116,11 @@ Useful commands:
 scripts/spin-up-local.sh status
 scripts/spin-up-local.sh down
 ```
+
+For staging or production spin-up, validate the live Vault contract before starting the stack:
+
+```bash
+VAULT_ADDR=https://vault.example.com \
+VAULT_TOKEN=<read-token> \
+scripts/ops/validate-secret-readiness.sh prod
+```

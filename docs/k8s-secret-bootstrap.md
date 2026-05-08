@@ -88,6 +88,7 @@ Check materialized target secret:
 ```bash
 kubectl -n moogle get secret moogle-runtime-secrets
 kubectl -n moogle get secret moogle-runtime-secrets -o jsonpath='{.data.PIPELINE_REDIS_URL}'
+kubectl -n moogle get secret moogle-runtime-secrets -o jsonpath='{.data.PIPELINE_REDIS_PASSWORD}'
 ```
 
 Expected: `SecretStore` and `ExternalSecret` are `Ready=True`, and `moogle-runtime-secrets` exists.
@@ -97,12 +98,14 @@ Expected: `SecretStore` and `ExternalSecret` are `Ready=True`, and `moogle-runti
 Deployments consuming runtime secrets:
 
 - `query-engine-<env-suffix>`
+- `pipeline-redis-<env-suffix>`
 - `runtime-metrics-exporter-<env-suffix>`
 
 Check rollout:
 
 ```bash
 kubectl -n moogle rollout status deploy/query-engine-<env-suffix>
+kubectl -n moogle rollout status deploy/pipeline-redis-<env-suffix>
 kubectl -n moogle rollout status deploy/runtime-metrics-exporter-<env-suffix>
 ```
 
