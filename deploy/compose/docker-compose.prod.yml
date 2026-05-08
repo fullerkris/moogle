@@ -8,6 +8,7 @@ services:
       CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../services/query-engine/public:/var/www/public:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -288,7 +289,7 @@ services:
     mem_reservation: 192M
     pids_limit: 256
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/${MONGO_HOST:-mongo}/${MONGO_PORT:-27017}' 2>/dev/null"]
+      test: ["CMD-SHELL", "nc -z $${MONGO_HOST:-mongo} $${MONGO_PORT:-27017}"]
       interval: 30s
       timeout: 10s
       retries: 3

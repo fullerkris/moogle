@@ -148,3 +148,12 @@ body::before {
         background-size: 100% 4px;
     }
 }
+
+.page-count {
+    color: var(--text);
+    @apply text-sm mt-2;
+}
+
+.page-count strong {
+    color: var(--orange);
+}

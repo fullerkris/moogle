@@ -8,6 +8,27 @@
         Referrer-Policy "strict-origin-when-cross-origin"
     }
 
+    @laravelAssets path /build/* /favicon.ico /robots.txt
+    handle @laravelAssets {
+        root * /var/www/public
+        file_server
+    }
+
+    @pageCount path /api/page-count
+    handle @pageCount {
+        rewrite * /index.php
+        reverse_proxy laravel:9000 {
+            transport fastcgi {
+                split .php
+                env SCRIPT_FILENAME /var/www/public/index.php
+                env DOCUMENT_ROOT /var/www/public
+                env REQUEST_URI /api/stats
+                read_timeout 30s
+                write_timeout 30s
+            }
+        }
+    }
+
     @api path /api/*
     handle @api {
         rewrite * /index.php
@@ -23,15 +44,6 @@
     }
 
     handle {
-        rewrite * /index.php
-        reverse_proxy laravel:9000 {
-            transport fastcgi {
-                split .php
-                env SCRIPT_FILENAME /var/www/public/index.php
-                env DOCUMENT_ROOT /var/www/public
-                read_timeout 30s
-                write_timeout 30s
-            }
-        }
+        reverse_proxy http://172.17.0.1:4173
     }
 }

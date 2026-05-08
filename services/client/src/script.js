@@ -1,4 +1,4 @@
-const backendURL = import.meta.env.VITE_BACKEND_URL || `${window.location.protocol}//${window.location.hostname}/api`;
+const backendURL = window.location.port === "4173" ? `${window.location.protocol}//${window.location.hostname}/api` : "/api";
 
 document.addEventListener("DOMContentLoaded", () => {
   const searchButton = document.getElementById("search-button");
@@ -41,17 +41,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   console.log(`Pinging backend at ${backendURL}...`);
-  // Check if backend is running and fetch number of entries from the DB
-  fetch(`${backendURL}/stats`)
+  // Check if backend is ready before enabling search.
+  fetch(`${backendURL}/health/ready`)
     .then((res) => res.json())
     .then((data) => {
-      if (data.status === "up") {
+      if (data.status === "up" || data.status === "ready") {
         infoContainer = document.getElementById("info-container");
 
-        formattedInfo = getFormattedInfoString(data.pages);
+        formattedInfo = data.pages ? getFormattedInfoString(data.pages) : "Search is online";
 
         html = `<span class="info">${formattedInfo}</span>`;
         infoContainer.innerHTML = html;
+        renderPageCount();
       } else if (data.status === "down") {
         serverDown();
       }
@@ -119,4 +120,19 @@ async function cringe() {
   } catch (error) {
     // console.log(error.message);
   }
+}
+
+function renderPageCount() {
+  const pageCountContainer = document.getElementById("page-count-container");
+  if (!pageCountContainer) return;
+
+  fetch(`${backendURL}/page-count`)
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.status === "up" && Number.isFinite(data.pages)) {
+        const count = new Intl.NumberFormat("en").format(data.pages);
+        pageCountContainer.innerHTML = `<span class="page-count">Pages crawled: <strong>${count}</strong></span>`;
+      }
+    })
+    .catch((error) => console.error("Error fetching page count:", error));
 }
